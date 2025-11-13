@@ -41,3 +41,17 @@ coverage/
 # Temporary folders
 tmp/
 temp/
+
+# History files (Cursor IDE)
+.history/
+
+# Development files
+*.html
+cost-*.md
+feature-*.md
+project-*.md
+simple-tracker.js
+ganpoom-tracker.js
+link-generator.html
+test-link.html
+airbridge.min.js
