@@ -16,28 +16,32 @@ export default async function handler(req, res) {
     }
 
     // Supabase에서 활성 에이전트 목록 조회
+    // account_number 컬럼이 없을 수 있으므로 모든 컬럼 조회
     const { data: agents, error } = await supabaseAdmin
       .from('agents')
-      .select(`
-        id,
-        name,
-        phone,
-        account_number,
-        memo,
-        commission_rate,
-        is_active,
-        created_at,
-        updated_at
-      `)
+      .select('*')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
 
     if (error) {
       console.error('에이전트 목록 조회 오류:', error)
+      console.error('에러 코드:', error.code)
+      console.error('에러 메시지:', error.message)
       console.error('에러 상세:', JSON.stringify(error, null, 2))
+      console.error('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? '설정됨' : '없음')
+      console.error('Service Role Key:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '설정됨' : '없음')
       return res.status(500).json({ 
         error: 'Database query failed',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
+        code: error.code || 'UNKNOWN'
+      })
+    }
+    
+    if (!agents || agents.length === 0) {
+      return res.status(200).json({
+        success: true,
+        agents: [],
+        total: 0
       })
     }
 

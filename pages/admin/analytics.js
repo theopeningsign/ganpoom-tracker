@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 
 export default function AnalyticsPage() {
   // 커스텀 스크롤바 스타일
@@ -183,6 +184,48 @@ export default function AnalyticsPage() {
       dailyStats: [],
       monthlyStats: []
     }
+  }
+
+  // 엑셀 다운로드 함수
+  const downloadExcel = () => {
+    if (!filteredAgentStats || filteredAgentStats.length === 0) {
+      alert('다운로드할 데이터가 없습니다.')
+      return
+    }
+
+    // 엑셀 데이터 준비
+    const excelData = filteredAgentStats.map(agent => ({
+      '에이전트 ID': agent.agentId,
+      '에이전트 이름': agent.name,
+      '총 접속수': agent.clicks || 0,
+      '견적요청 건수': agent.quotes || 0,
+      '전환율(%)': agent.clicks > 0 ? ((agent.quotes / agent.clicks) * 100).toFixed(1) : '0.0',
+      '총 커미션(원)': (agent.commission || 0).toLocaleString(),
+      '조회 기간': agent.period || `${dateRange.startDate} ~ ${dateRange.endDate}`
+    }))
+
+    // 워크북 생성
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(excelData)
+    
+    // 컬럼 너비 설정
+    ws['!cols'] = [
+      { wch: 12 }, // 에이전트 ID
+      { wch: 15 }, // 에이전트 이름
+      { wch: 12 }, // 총 접속수
+      { wch: 14 }, // 견적요청 건수
+      { wch: 12 }, // 전환율
+      { wch: 15 }, // 총 커미션
+      { wch: 25 }  // 조회 기간
+    ]
+
+    XLSX.utils.book_append_sheet(wb, ws, '에이전트별 실적')
+
+    // 파일명 생성 (기간 포함)
+    const fileName = `에이전트_실적_${dateRange.startDate}_${dateRange.endDate}.xlsx`
+
+    // 다운로드
+    XLSX.writeFile(wb, fileName)
   }
 
   const setQuickDateRange = (type) => {
@@ -457,36 +500,70 @@ export default function AnalyticsPage() {
           marginBottom: '30px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
             <h3 style={{ margin: 0, color: '#2c3e50' }}>👥 에이전트별 실적</h3>
             
-            {/* 검색창 */}
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                placeholder="에이전트 이름 또는 ID 검색..."
-                value={agentSearchTerm}
-                onChange={(e) => setAgentSearchTerm(e.target.value)}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {/* 엑셀 다운로드 버튼 */}
+              <button
+                onClick={downloadExcel}
+                disabled={!filteredAgentStats || filteredAgentStats.length === 0}
                 style={{
-                  padding: '10px 40px 10px 15px',
-                  border: '2px solid #e1e5e9',
-                  borderRadius: '25px',
+                  padding: '10px 20px',
+                  background: filteredAgentStats && filteredAgentStats.length > 0 ? '#28a745' : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
                   fontSize: '14px',
-                  width: '250px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
+                  fontWeight: 'bold',
+                  cursor: filteredAgentStats && filteredAgentStats.length > 0 ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'background 0.2s'
                 }}
-                onFocus={(e) => e.target.style.borderColor = '#4facfe'}
-                onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
-              />
-              <div style={{
-                position: 'absolute',
-                right: '15px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#666',
-                fontSize: '16px'
-              }}>🔍</div>
+                onMouseOver={(e) => {
+                  if (filteredAgentStats && filteredAgentStats.length > 0) {
+                    e.target.style.background = '#218838'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (filteredAgentStats && filteredAgentStats.length > 0) {
+                    e.target.style.background = '#28a745'
+                  }
+                }}
+              >
+                📥 엑셀 다운로드
+              </button>
+              
+              {/* 검색창 */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="에이전트 이름 또는 ID 검색..."
+                  value={agentSearchTerm}
+                  onChange={(e) => setAgentSearchTerm(e.target.value)}
+                  style={{
+                    padding: '10px 40px 10px 15px',
+                    border: '2px solid #e1e5e9',
+                    borderRadius: '25px',
+                    fontSize: '14px',
+                    width: '250px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#4facfe'}
+                  onBlur={(e) => e.target.style.borderColor = '#e1e5e9'}
+                />
+                <div style={{
+                  position: 'absolute',
+                  right: '15px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#666',
+                  fontSize: '16px'
+                }}>🔍</div>
+              </div>
             </div>
           </div>
           
