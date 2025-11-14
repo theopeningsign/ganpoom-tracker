@@ -31,7 +31,14 @@ export default async function handler(req, res) {
     const conversionRate = totalClicks > 0 ? ((totalQuotes / totalClicks) * 100).toFixed(1) : '0.0'
 
     // 최근 견적요청, 상위 에이전트, 월별 통계를 병렬로 조회
-    const [recentQuotesResult, topAgentsResult, monthlyQueries] = await Promise.all([
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+    const startISO = todayStart.toISOString()
+    const endISO = todayEnd.toISOString()
+
+    const [recentQuotesResult, topAgentsResult, monthlyQueries, todayQuotesResult] = await Promise.all([
       // 최근 견적요청 목록 (최대 10개)
       supabaseAdmin
         .from('quote_requests')
@@ -79,6 +86,11 @@ export default async function handler(req, res) {
         
         return { queries, dates }
       })()
+      supabaseAdmin
+        .from('quote_requests')
+        .select('agent_id, agents!inner(name)')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
     ])
 
     // 월별 통계 결과 조회 (병렬) - 에러 발생 시 기본값 사용
@@ -140,6 +152,21 @@ export default async function handler(req, res) {
 
     const recentQuotes = recentQuotesResult.data || []
 
+    const todayQuotes = todayQuotesResult.data || []
+    const todayQuoteMap = {}
+    todayQuotes.forEach((item) => {
+      const agentId = item.agent_id || 'unknown'
+      if (!todayQuoteMap[agentId]) {
+        todayQuoteMap[agentId] = {
+          agentId,
+          name: item.agents?.name || '알 수 없음',
+          quotes: 0
+        }
+      }
+      todayQuoteMap[agentId].quotes += 1
+    })
+    const todayQuoteList = Object.values(todayQuoteMap).sort((a, b) => b.quotes - a.quotes)
+
     res.status(200).json({
       success: true,
       stats: {
@@ -151,7 +178,8 @@ export default async function handler(req, res) {
       },
       recentQuotes: recentQuotes || [],
       topAgents: topAgents.sort((a, b) => b.quotes - a.quotes),
-      monthlyStats
+      monthlyStats,
+      todayQuotes: todayQuoteList
     })
 
   } catch (error) {

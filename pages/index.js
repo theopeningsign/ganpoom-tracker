@@ -10,6 +10,7 @@ export default function HomePage() {
     conversionRate: 0
   })
   const [recentQuotes, setRecentQuotes] = useState([])
+  const [todayQuotes, setTodayQuotes] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,8 +34,9 @@ export default function HomePage() {
           conversionRate: result.stats.conversionRate
         })
         
-        // 최근 견적요청 설정
+        // 최근 견적요청, 오늘 견적요청 설정
         setRecentQuotes(result.recentQuotes || [])
+        setTodayQuotes(result.todayQuotes || [])
         
         setLoading(false)
         return
@@ -283,7 +285,7 @@ export default function HomePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.totalQuotes === 0 ? (
+                    {todayQuotes.length === 0 ? (
                     <tr>
                       <td colSpan="3" style={{ 
                         padding: '40px', 
@@ -291,29 +293,27 @@ export default function HomePage() {
                         color: '#666',
                         fontStyle: 'italic'
                       }}>
-                        아직 견적요청이 없습니다.<br/>
-                        에이전트를 생성하고 추적을 시작하세요!
+                        아직 오늘 접수된 견적요청이 없습니다.<br/>
+                        에이전트를 통해 견적요청이 들어오면 자동으로 표시됩니다.
                       </td>
                     </tr>
                     ) : (
-                      // 실제 데이터가 있으면 여기서 표시 (나중에 구현)
-                      <tr>
-                        <td colSpan="3" style={{ 
-                          padding: '40px', 
-                          textAlign: 'center', 
-                          color: '#666',
-                          fontStyle: 'italic'
-                        }}>
-                          에이전트별 견적요청 통계가 여기에 표시됩니다.
-                      </td>
-                    </tr>
+                      todayQuotes.map((agent, index) => (
+                        <tr key={agent.agentId}>
+                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef' }}>{index + 1}</td>
+                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef' }}>{agent.name}</td>
+                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef', textAlign: 'center', fontWeight: 'bold' }}>
+                            {agent.quotes}
+                          </td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
               </div>
 
               {/* 총합 요약 - 실제 데이터 기반 */}
-              {stats.totalQuotes > 0 && (
+              {todayQuotes.length > 0 && (
                 <div style={{
                   padding: '15px 20px',
                   background: 'linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%)',
@@ -330,7 +330,10 @@ export default function HomePage() {
                     fontSize: '1rem'
                   }}>
                     <span>💡</span>
-                    <span>오늘 총 {stats.totalQuotes}건의 견적요청이 접수되었습니다 (활성 에이전트: {stats.totalAgents}명)</span>
+                    <span>
+                      오늘 총 {todayQuotes.reduce((sum, agent) => sum + agent.quotes, 0)}건의 견적요청이 접수되었습니다
+                      (참여 에이전트: {todayQuotes.length}명)
+                    </span>
                   </div>
                 </div>
               )}
