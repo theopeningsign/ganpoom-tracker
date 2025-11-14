@@ -101,3 +101,4 @@ JOIN agents ON quote_requests.agent_id = agents.id
 WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
 GROUP BY agent_id, agents.name, svc_type
 ORDER BY agent_name, quotes DESC;
+

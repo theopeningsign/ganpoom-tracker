@@ -10,6 +10,7 @@ export default function SettlementPage() {
   const [settlementData, setSettlementData] = useState([])
   const [totalCommission, setTotalCommission] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [statusMessage, setStatusMessage] = useState({ type: '', text: '' })
 
   useEffect(() => {
     // 현재 월과 정산 대상 월 설정
@@ -79,127 +80,143 @@ export default function SettlementPage() {
     return viewYear > 2025 || (viewYear === 2025 && viewMonth > 1)
   }
 
-  const loadSettlementData = (targetMonth) => {
+  const loadSettlementData = async (targetMonth) => {
     try {
       setLoading(true)
       
-      // 정산 대상 에이전트들 (실제로는 DB에서 가져올 데이터)
-      const agents = [
-        { agentId: 'Ab3kM9', name: '김철수' },
-        { agentId: 'Xy7nP2', name: '이영희' },
-        { agentId: 'Mn8kL4', name: '박민수' },
-        { agentId: 'Qw9rT5', name: '정미영' },
-        { agentId: 'Er6yU8', name: '최동훈' },
-        { agentId: 'Ty3iO1', name: '한지수' },
-        { agentId: 'Ui7pA4', name: '송민호' },
-        { agentId: 'Op2sD6', name: '윤서연' },
-        { agentId: 'As5dF7', name: '강혜진' },
-        { agentId: 'Gh8jK2', name: '조성민' },
-        { agentId: 'Lm4nB9', name: '신유리' },
-        { agentId: 'Cv6xZ3', name: '홍준석' },
-        { agentId: 'Bn7mQ1', name: '류소영' },
-        { agentId: 'Wq2eR8', name: '임태현' },
-        { agentId: 'Rt5yU4', name: '안미경' }
-      ]
-
-      // 정산 대상월의 실적 계산
-      const monthNum = parseInt(targetMonth.split('-')[1])
-      const settlementList = agents.map(agent => {
-        // 해당 월 견적요청 수 계산 (상세통계와 동일한 로직)
-        const baseQuotes = agent.name === '류소영' ? 20 :
-                          agent.name === '김철수' ? 15 :
-                          agent.name === '이영희' ? 12 :
-                          agent.name === '임태현' ? 3 :
-                          8
-
-        const seed = agent.agentId.charCodeAt(0) + agent.agentId.charCodeAt(1) + monthNum
-        const variation = (seed % 7) - 3
-        const monthlyQuotes = Math.max(0, baseQuotes + variation)
-        // 에이전트별 단가 설정 (실제로는 DB에서 가져올 데이터)
-        const unitPrice = agent.name === '류소영' ? 12000 : // 우수 에이전트
-                         agent.name === '김철수' ? 11000 : // 베테랑 에이전트
-                         agent.name === '임태현' ? 8000 :  // 신입 에이전트
-                         10000 // 기본 단가
-
-        const commission = monthlyQuotes * unitPrice
-
-        return {
-          agentId: agent.agentId,
-          name: agent.name,
-          phone: '010-0000-0000', // 실제로는 DB에서 가져올 데이터
-          account: '국민은행 123-456-789012', // 실제로는 DB에서 가져올 데이터
-          quotes: monthlyQuotes,
-          unitPrice: unitPrice,
-          commission: commission,
-          settlementMonth: targetMonth,
-          isSettled: false // 실제로는 DB에서 정산 완료 여부 확인
-        }
-      }).filter(agent => agent.quotes > 0) // 실적이 있는 에이전트만
-
-      // 커미션 총액 계산
-      const total = settlementList.reduce((sum, agent) => sum + agent.commission, 0)
+      // 실제 API에서 정산 데이터 가져오기
+      const response = await fetch(`/api/stats/settlement?month=${targetMonth}`)
       
-      setSettlementData(settlementList)
-      setTotalCommission(total)
+      if (response.ok) {
+        const result = await response.json()
+        
+        setSettlementData(result.settlementData || [])
+        setTotalCommission(result.stats?.totalCommission || 0)
+      } else {
+        throw new Error('정산 데이터 API 호출 실패')
+      }
     } catch (error) {
       console.error('정산 데이터 로드 오류:', error)
+      // 실패시 빈 데이터로 설정
+      setSettlementData([])
+      setTotalCommission(0)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSettlement = (agentId) => {
+  const showMessage = (type, text) => {
+    setStatusMessage({ type, text })
+    setTimeout(() => setStatusMessage({ type: '', text: '' }), 5000)
+  }
+
+  const handleSettlement = async (agentId) => {
     if (window.confirm('정산을 완료하시겠습니까?\n\n완료 후에는 되돌릴 수 없습니다.')) {
-      // 실제로는 DB 업데이트
-      setSettlementData(prev => 
-        prev.map(agent => 
-          agent.agentId === agentId 
-            ? { ...agent, isSettled: true }
-            : agent
-        )
-      )
-      alert('✅ 정산이 완료되었습니다.')
+      try {
+        const response = await fetch('/api/settlement/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            agentId,
+            month: viewingMonth,
+            isBulk: false
+          }),
+        })
+
+        if (response.ok) {
+          showMessage('success', '✅ 정산이 완료되었습니다.')
+          // 데이터 새로고침
+          loadSettlementData(viewingMonth)
+        } else {
+          throw new Error('정산 처리 실패')
+        }
+      } catch (error) {
+        console.error('정산 처리 오류:', error)
+        showMessage('error', '정산 처리에 실패했습니다.')
+      }
     }
   }
 
-  const handleBulkSettlement = () => {
+  const handleBulkSettlement = async () => {
     const unsettledCount = settlementData.filter(agent => !agent.isSettled).length
     if (unsettledCount === 0) {
-      alert('정산할 대상이 없습니다.')
+      showMessage('warning', '정산할 대상이 없습니다.')
       return
     }
 
-    if (window.confirm(`${unsettledCount}명의 에이전트를 일괄 정산하시겠습니까?\n\n총 지급액: ₩${settlementData.filter(agent => !agent.isSettled).reduce((sum, agent) => sum + agent.commission, 0).toLocaleString()}`)) {
-      setSettlementData(prev => 
-        prev.map(agent => ({ ...agent, isSettled: true }))
-      )
-      alert('✅ 일괄 정산이 완료되었습니다.')
+    const totalAmount = settlementData
+      .filter(agent => !agent.isSettled)
+      .reduce((sum, agent) => sum + agent.commission, 0)
+
+    if (window.confirm(`${unsettledCount}명의 에이전트를 일괄 정산하시겠습니까?\n\n총 지급액: ₩${totalAmount.toLocaleString()}`)) {
+      try {
+        // 각 에이전트별로 정산 처리
+        const settlementPromises = settlementData
+          .filter(agent => !agent.isSettled)
+          .map(agent => 
+            fetch('/api/settlement/complete', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                agentId: agent.agentId,
+                month: viewingMonth,
+                isBulk: true
+              }),
+            })
+          )
+
+        const results = await Promise.all(settlementPromises)
+        const allSuccess = results.every(r => r.ok)
+
+        if (allSuccess) {
+          showMessage('success', `✅ ${unsettledCount}명의 에이전트 일괄 정산이 완료되었습니다.`)
+          // 데이터 새로고침
+          loadSettlementData(viewingMonth)
+        } else {
+          throw new Error('일부 정산 처리 실패')
+        }
+      } catch (error) {
+        console.error('일괄 정산 오류:', error)
+        showMessage('error', '일괄 정산 처리에 실패했습니다.')
+      }
     }
   }
 
-  const handleUnitPriceChange = (agentId) => {
+  const handleUnitPriceChange = async (agentId) => {
     const agent = settlementData.find(a => a.agentId === agentId)
     const newPrice = prompt(`${agent.name}의 단가를 입력하세요 (현재: ₩${agent.unitPrice.toLocaleString()})`, agent.unitPrice)
     
     if (newPrice && !isNaN(newPrice) && parseInt(newPrice) > 0) {
-      const updatedPrice = parseInt(newPrice)
-      setSettlementData(prev => 
-        prev.map(a => 
-          a.agentId === agentId 
-            ? { ...a, unitPrice: updatedPrice, commission: a.quotes * updatedPrice }
-            : a
-        )
-      )
-      
-      // 총 커미션 재계산
-      const newTotal = settlementData.reduce((sum, a) => 
-        a.agentId === agentId 
-          ? sum + (a.quotes * updatedPrice)
-          : sum + a.commission, 0
-      )
-      setTotalCommission(newTotal)
-      
-      alert(`✅ ${agent.name}의 단가가 ₩${updatedPrice.toLocaleString()}으로 변경되었습니다.`)
+      try {
+        const updatedPrice = parseInt(newPrice)
+        
+        // 실제 API 호출 (에이전트 단가 업데이트)
+        const response = await fetch('/api/agents/update', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            agentId,
+            commission_per_quote: updatedPrice
+          }),
+        })
+
+        if (response.ok) {
+          showMessage('success', `✅ ${agent.name}의 단가가 ₩${updatedPrice.toLocaleString()}으로 변경되었습니다.`)
+          // 데이터 새로고침
+          loadSettlementData(viewingMonth)
+        } else {
+          throw new Error('단가 변경 실패')
+        }
+      } catch (error) {
+        console.error('단가 변경 오류:', error)
+        showMessage('error', '단가 변경에 실패했습니다.')
+      }
     }
   }
 
@@ -289,6 +306,30 @@ export default function SettlementPage() {
           </div>
         </div>
       </div>
+
+      {/* 상태 메시지 */}
+      {statusMessage.text && (
+        <div style={{
+          position: 'fixed',
+          top: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          padding: '15px 25px',
+          borderRadius: '10px',
+          background: statusMessage.type === 'success' ? 
+            'linear-gradient(135deg, #28a745, #20c997)' : 
+            statusMessage.type === 'warning' ?
+            'linear-gradient(135deg, #ffc107, #ff9800)' :
+            'linear-gradient(135deg, #dc3545, #e74c3c)',
+          color: 'white',
+          fontWeight: 'bold',
+          boxShadow: '0 5px 20px rgba(0,0,0,0.3)',
+          animation: 'slideDown 0.3s ease-out'
+        }}>
+          {statusMessage.text}
+        </div>
+      )}
 
       {/* 메인 컨텐츠 */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
@@ -654,6 +695,17 @@ export default function SettlementPage() {
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes slideDown {
+          0% { 
+            transform: translate(-50%, -20px);
+            opacity: 0;
+          }
+          100% { 
+            transform: translate(-50%, 0);
+            opacity: 1;
+          }
         }
         
         .custom-scrollbar::-webkit-scrollbar {

@@ -188,17 +188,139 @@ a {
   @apply bg-primary-50 text-primary-700 border border-primary-200;
 }
 
-/* 반응형 */
-@media (max-width: 640px) {
+/* 모바일 최적화 강화 */
+@media (max-width: 768px) {
+  /* 기본 폰트 및 레이아웃 */
+  html {
+    font-size: 16px; /* iOS 줌 방지 */
+  }
+  
+  body {
+    @apply text-base leading-relaxed;
+  }
+  
+  /* 터치 친화적인 버튼 */
+  .btn {
+    @apply px-6 py-4 text-base min-h-[48px];
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  /* 폼 요소 모바일 최적화 */
+  .form-input {
+    @apply px-4 py-4 text-base min-h-[48px] rounded-lg;
+    font-size: 16px !important; /* iOS 줌 방지 */
+  }
+  
+  .form-label {
+    @apply text-base mb-3 font-semibold;
+  }
+  
+  /* 카드 컴포넌트 */
+  .card {
+    @apply rounded-xl shadow-md;
+  }
+  
+  .card-header {
+    @apply px-4 py-4;
+  }
+  
+  .card-body {
+    @apply px-4 py-4;
+  }
+  
+  /* 통계 카드 */
   .stat-card {
-    @apply p-4;
+    @apply p-4 rounded-xl;
   }
   
   .stat-number {
     @apply text-xl;
   }
   
+  .stat-label {
+    @apply text-sm;
+  }
+  
+  /* 모달 */
   .modal-content {
-    @apply w-11/12 top-10;
+    @apply w-11/12 top-10 mx-4 rounded-xl;
+  }
+  
+  /* 테이블 */
+  .table {
+    @apply text-sm;
+    font-size: 14px;
+  }
+  
+  .table th {
+    @apply px-3 py-3 text-xs;
+  }
+  
+  .table td {
+    @apply px-3 py-4 text-sm;
+    word-break: break-word;
+  }
+  
+  /* 배지 */
+  .badge {
+    @apply px-3 py-1 text-sm rounded-full;
+  }
+  
+  /* 알림 */
+  .alert {
+    @apply p-4 rounded-xl text-sm leading-relaxed;
   }
 }
+
+@media (max-width: 640px) {
+  /* 더 작은 화면 추가 최적화 */
+  .btn {
+    @apply px-5 py-3 text-sm min-h-[44px];
+  }
+  
+  .form-input {
+    @apply px-3 py-3 text-sm min-h-[44px];
+    font-size: 16px !important;
+  }
+  
+  .stat-card {
+    @apply p-3;
+  }
+  
+  .stat-number {
+    @apply text-lg;
+  }
+  
+  .card-header, .card-body {
+    @apply px-3 py-3;
+  }
+  
+  .table {
+    font-size: 12px;
+  }
+  
+  .table th, .table td {
+    @apply px-2 py-2;
+  }
+}
+
+@media (max-width: 375px) {
+  /* 매우 작은 화면 (iPhone SE 등) */
+  .btn {
+    @apply px-4 py-3 text-sm;
+  }
+  
+  .form-input {
+    @apply px-3 py-3;
+  }
+  
+  .modal-content {
+    @apply w-full mx-2 top-5;
+  }
+  
+  .stat-card {
+    @apply p-2;
+  }
+}
+

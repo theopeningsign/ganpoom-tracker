@@ -9,7 +9,27 @@
     
     // 설정
     const CONFIG = {
-        apiEndpoint: 'https://tracking.ganpoom.com/api', // 배포 후 실제 도메인
+        // API 엔드포인트 자동 감지 (현재 도메인 기반)
+        // ganpoom.com에서 사용시: 현재 도메인의 /api 사용
+        // 로컬 개발시: http://localhost:3000/api 사용
+        apiEndpoint: (function() {
+            // 스크립트 태그에서 data-api-endpoint 속성 확인
+            const scriptTag = document.currentScript || document.querySelector('script[data-api-endpoint]');
+            if (scriptTag && scriptTag.getAttribute('data-api-endpoint')) {
+                return scriptTag.getAttribute('data-api-endpoint');
+            }
+            // 스크립트 src에서 추출
+            const scripts = document.getElementsByTagName('script');
+            for (let i = 0; i < scripts.length; i++) {
+                const src = scripts[i].src;
+                if (src && src.includes('ganpoom-tracker.js')) {
+                    const url = new URL(src, window.location.href);
+                    return url.origin + '/api';
+                }
+            }
+            // 기본값: 현재 도메인 기반
+            return (typeof window !== 'undefined' ? window.location.origin : '') + '/api';
+        })(),
         cookieName: 'ganpoom_agent_ref',
         cookieExpiry: 30, // 30일
         sessionCookieName: 'ganpoom_session',

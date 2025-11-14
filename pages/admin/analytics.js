@@ -62,12 +62,36 @@ export default function AnalyticsPage() {
   const loadAnalytics = async () => {
     setLoading(true)
     try {
-      // Mock 데이터로 시뮬레이션 (실제로는 API에서 가져올 예정)
+      // 실제 API에서 통계 데이터 가져오기
+      const params = new URLSearchParams({
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate
+      })
+      
+      const response = await fetch(`/api/stats/analytics?${params}`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        
+        // 실제 API 데이터 설정
+        setAnalytics({
+          totalQuotes: result.totalQuotes,
+          totalCommission: result.totalCommission,
+          agentStats: result.agentStats,
+          dailyStats: result.dailyStats,
+          monthlyStats: result.monthlyStats
+        })
+        setFilteredAgentStats(result.agentStats)
+      } else {
+        throw new Error('통계 API 호출 실패')
+      }
+    } catch (error) {
+      console.error('통계 로드 오류:', error)
+      
+      // 실패시 fallback으로 Mock 데이터 사용
       const mockData = generateAnalyticsData()
       setAnalytics(mockData)
       setFilteredAgentStats(mockData.agentStats)
-    } catch (error) {
-      console.error('통계 로드 오류:', error)
     } finally {
       setLoading(false)
     }
@@ -101,7 +125,15 @@ export default function AnalyticsPage() {
     return agents.map(agent => {
       // 각 에이전트별로 1월~11월 월별 실적 생성
       const monthlyData = {}
+      const monthlyClickData = {} // 🔥 월별 클릭 데이터 추가!
       let totalQuotes = 0
+      let totalClicks = 0
+      
+      // 접속수 계산을 위한 전환율 설정 (견적요청의 3~10배 정도로 현실적 설정)
+      const clickMultiplier = agent.name === '류소영' ? 5 : // 전환율 좋음 (20%)
+                             agent.name === '김철수' ? 7 :  // 전환율 보통 (14%)
+                             agent.name === '임태현' ? 15 : // 전환율 낮음 (6.7%)
+                             8 // 평균 전환율 (12.5%)
       
       for (let month = 1; month <= 11; month++) {
         // 월별로 0~30건 사이의 랜덤 견적요청 (현실적인 범위)
@@ -116,119 +148,40 @@ export default function AnalyticsPage() {
         const seed = agent.agentId.charCodeAt(0) + agent.agentId.charCodeAt(1) + month
         const variation = (seed % 7) - 3 // -3 ~ +3 범위의 고정된 변동
         const monthlyQuotes = Math.max(0, baseQuotes + variation)
+        
+        // 월별 클릭수 = 견적요청 * 전환율 배수
+        const monthlyClicks = Math.max(1, monthlyQuotes * clickMultiplier)
+        
         monthlyData[`2025-${month.toString().padStart(2, '0')}`] = monthlyQuotes
+        monthlyClickData[`2025-${month.toString().padStart(2, '0')}`] = monthlyClicks // 🔥 월별 클릭 데이터 저장!
+        
         totalQuotes += monthlyQuotes
+        totalClicks += monthlyClicks
       }
-      
-      // 접속수 계산 (견적요청의 3~10배 정도로 현실적 설정)
-      const clickMultiplier = agent.name === '류소영' ? 5 : // 전환율 좋음 (20%)
-                             agent.name === '김철수' ? 7 :  // 전환율 보통 (14%)
-                             agent.name === '임태현' ? 15 : // 전환율 낮음 (6.7%)
-                             8 // 평균 전환율 (12.5%)
-      
-      const monthlyClicks = Math.max(1, monthlyData['2025-11'] * clickMultiplier)
       
       return {
         agentId: agent.agentId,
         name: agent.name,
         quotes: monthlyData['2025-11'], // 11월 실적
-        clicks: monthlyClicks, // 11월 접속수
+        clicks: monthlyClickData['2025-11'], // 🔥 11월 접속수 (월별 데이터에서 가져옴)
         commission: monthlyData['2025-11'] * 10000,
         period: '2025-11',
         totalYearQuotes: totalQuotes,
-        monthlyData: monthlyData
+        totalYearClicks: totalClicks, // 🔥 연간 총 클릭수 추가
+        monthlyData: monthlyData, // 월별 견적요청 데이터
+        monthlyClickData: monthlyClickData // 🔥 월별 클릭 데이터 추가!
       }
     })
   }
 
   const generateAnalyticsData = () => {
-    // 실제로는 API에서 가져올 데이터 (localStorage에서 실제 에이전트들 불러오기)
-    const savedAgents = JSON.parse(localStorage.getItem('mockAgents') || '[]')
-    
-    // 선택된 기간 파싱
-    const startDate = new Date(dateRange.startDate)
-    const endDate = new Date(dateRange.endDate)
-    const startYear = startDate.getFullYear()
-    const startMonth = startDate.getMonth() + 1
-    const endYear = endDate.getFullYear()
-    const endMonth = endDate.getMonth() + 1
-    
-    // 실제 에이전트가 있으면 사용, 없으면 현실적인 더미 데이터
-    const allAgentData = savedAgents.length > 0 ? 
-      savedAgents.map(agent => ({
-        agentId: agent.id,
-        name: agent.name,
-        quotes: Math.floor(Math.random() * 25) + 5, // 실제로는 DB에서 조회
-        commission: (Math.floor(Math.random() * 25) + 5) * 10000,
-        period: '2025-11'
-      })) :
-      generateRealisticAgentData()
-
-    // 선택된 기간에 해당하는 데이터만 필터링
-    const agentStats = allAgentData.map(agent => {
-      if (!agent.monthlyData) return agent
-      
-      // 선택된 기간의 월별 데이터 합계 계산
-      let periodQuotes = 0
-      for (let year = startYear; year <= endYear; year++) {
-        const monthStart = year === startYear ? startMonth : 1
-        const monthEnd = year === endYear ? endMonth : 12
-        
-        for (let month = monthStart; month <= monthEnd; month++) {
-          const monthKey = `${year}-${month.toString().padStart(2, '0')}`
-          periodQuotes += agent.monthlyData[monthKey] || 0
-        }
-      }
-      
-      return {
-        ...agent,
-        quotes: periodQuotes,
-        commission: periodQuotes * 10000,
-        period: `${dateRange.startDate} ~ ${dateRange.endDate}`
-      }
-    })
-
-    const dailyStats = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      // 날짜를 기반으로 고정된 값 생성
-      const dayOfMonth = date.getDate()
-      const quotes = Math.max(1, (dayOfMonth % 12) + 2) // 3~14 범위의 고정값
-      return {
-        date: date.toISOString().split('T')[0],
-        quotes: quotes,
-        commission: quotes * 10000
-      }
-    }).reverse()
-
-    // 선택된 기간의 월별 전체 통계 계산
-    const monthlyStats = []
-    for (let year = startYear; year <= endYear; year++) {
-      const monthStart = year === startYear ? startMonth : 1
-      const monthEnd = year === endYear ? endMonth : 12
-      
-      for (let month = monthStart; month <= monthEnd; month++) {
-        const monthKey = `${year}-${month.toString().padStart(2, '0')}`
-        const monthlyTotal = allAgentData.reduce((sum, agent) => {
-          return sum + (agent.monthlyData ? (agent.monthlyData[monthKey] || 0) : 0)
-        }, 0)
-        
-        if (monthlyTotal > 0) { // 0건인 달은 제외
-          monthlyStats.push({
-            month: monthKey,
-            quotes: monthlyTotal,
-            commission: monthlyTotal * 10000
-          })
-        }
-      }
-    }
-
+    // API 실패시 빈 데이터 반환 (더미 데이터 생성 안 함)
     return {
-      totalQuotes: agentStats.reduce((sum, agent) => sum + agent.quotes, 0),
-      totalCommission: agentStats.reduce((sum, agent) => sum + agent.commission, 0),
-      agentStats,
-      dailyStats,
-      monthlyStats
+      totalQuotes: 0,
+      totalCommission: 0,
+      agentStats: [],
+      dailyStats: [],
+      monthlyStats: []
     }
   }
 
@@ -293,12 +246,7 @@ export default function AnalyticsPage() {
         return
     }
 
-    console.log('날짜 계산 (수정됨):', {
-      type,
-      오늘: `${year}-${month.toString().padStart(2, '0')}-${date.toString().padStart(2, '0')}`,
-      시작일: startDateStr,
-      종료일: endDateStr
-    })
+    // 날짜 범위 설정 완료
 
     setDateRange({
       startDate: startDateStr,

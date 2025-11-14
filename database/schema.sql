@@ -173,13 +173,5 @@ CREATE TRIGGER update_agents_updated_at BEFORE UPDATE ON agents
 CREATE TRIGGER update_quote_requests_updated_at BEFORE UPDATE ON quote_requests
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- 샘플 데이터 (테스트용)
-INSERT INTO agents (id, name, memo, commission_per_quote) VALUES
-('Ab3kM9', '김철수', '네이버 블로그', 10000),
-('Xy7nP2', '이영희', '인스타그램', 10000),
-('Qw8rT5', '박민수', '유튜브', 10000),
-('Zx4vB1', '최지은', '페이스북', 10000);
-
--- 관리자 계정 생성 (비밀번호: admin123)
-INSERT INTO admin_users (email, password_hash, name, role) VALUES
-('admin@ganpoom.com', '$2b$10$rOvHUvJzYzNvQQzv5QzQqOXJYxJYxJYxJYxJYxJYxJYxJYxJYxJYx', '관리자', 'admin');
+-- 배포용: 빈 테이블로 시작
+-- 실제 에이전트는 관리 페이지에서 생성하세요

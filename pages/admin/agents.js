@@ -16,6 +16,13 @@ export default function AgentManagement() {
     account: '',
     memo: ''
   })
+  const [statusMessage, setStatusMessage] = useState({ type: '', text: '' }) // 상태 메시지 추가
+
+  // 상태 메시지 표시 함수
+  const showMessage = (type, text) => {
+    setStatusMessage({ type, text })
+    setTimeout(() => setStatusMessage({ type: '', text: '' }), 5000) // 5초 후 자동 제거
+  }
 
   // 에이전트 목록 로드
   useEffect(() => {
@@ -56,17 +63,19 @@ export default function AgentManagement() {
     try {
       setLoading(true)
       
-      // localStorage에서 저장된 에이전트 불러오기
-      const savedAgents = localStorage.getItem('mockAgents')
-      if (savedAgents) {
-        const parsedAgents = JSON.parse(savedAgents)
-        setAgents(parsedAgents)
+      // 실제 API에서 에이전트 목록 가져오기
+      const response = await fetch('/api/agents')
+      
+      if (response.ok) {
+        const result = await response.json()
+        setAgents(result.agents || [])
       } else {
-        setAgents([])
+        throw new Error(`API 호출 실패: ${response.status}`)
       }
     } catch (error) {
       console.error('에이전트 목록 로드 실패:', error)
-      alert('에이전트 목록을 불러오는데 실패했습니다.')
+      showMessage('error', '에이전트 목록을 불러오는데 실패했습니다.')
+      setAgents([]) // 실패시 빈 배열로 설정
     } finally {
       setLoading(false)
     }
@@ -76,14 +85,14 @@ export default function AgentManagement() {
     e.preventDefault()
     
     if (!formData.name || !formData.phone || !formData.account) {
-      alert('이름, 전화번호, 계좌번호를 모두 입력해주세요.')
+      showMessage('error', '이름, 전화번호, 계좌번호를 모두 입력해주세요.')
       return
     }
 
     try {
       setCreating(true)
       
-      const response = await fetch('/api/mock/agents/create', {
+      const response = await fetch('/api/agents/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -101,41 +110,50 @@ export default function AgentManagement() {
         setFormData({ name: '', phone: '', account: '', memo: '' })
         setShowCreateForm(false)
         
-        alert(`✅ ${newAgent.name} 에이전트가 생성되었습니다!\n\n추적 링크: ${newAgent.trackingLink}`)
+        showMessage('success', `✅ ${newAgent.name} 에이전트가 생성되었습니다! 추적 링크: ${newAgent.trackingLink}`)
       } else {
         throw new Error('에이전트 생성 실패')
       }
     } catch (error) {
       console.error('에이전트 생성 실패:', error)
-      alert('에이전트 생성에 실패했습니다.')
+      showMessage('error', '에이전트 생성에 실패했습니다.')
     } finally {
       setCreating(false)
     }
   }
 
-  const deleteAgent = (agentId, agentName) => {
+  const deleteAgent = async (agentId, agentName) => {
     if (window.confirm(`정말로 "${agentName}" 에이전트를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) {
-      // Mock 환경에서는 로컬 상태만 업데이트
-      setAgents(prev => prev.filter(agent => agent.id !== agentId))
-      setFilteredAgents(prev => prev.filter(agent => agent.id !== agentId))
-      
-      // localStorage에서도 삭제
-      const savedAgents = localStorage.getItem('mockAgents')
-      if (savedAgents) {
-        const parsedAgents = JSON.parse(savedAgents)
-        const updatedAgents = parsedAgents.filter(agent => agent.id !== agentId)
-        localStorage.setItem('mockAgents', JSON.stringify(updatedAgents))
+      try {
+        const response = await fetch('/api/agents/delete', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ agentId }),
+        })
+
+        if (response.ok) {
+          // 로컬 상태에서 제거
+          setAgents(prev => prev.filter(agent => agent.id !== agentId))
+          setFilteredAgents(prev => prev.filter(agent => agent.id !== agentId))
+          
+          showMessage('success', `✅ "${agentName}" 에이전트가 삭제되었습니다.`)
+        } else {
+          throw new Error('에이전트 삭제 실패')
+        }
+      } catch (error) {
+        console.error('에이전트 삭제 실패:', error)
+        showMessage('error', '에이전트 삭제에 실패했습니다.')
       }
-      
-      alert(`✅ "${agentName}" 에이전트가 삭제되었습니다.`)
     }
   }
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
-      alert('링크가 클립보드에 복사되었습니다!')
+      showMessage('success', '📋 링크가 클립보드에 복사되었습니다!')
     }).catch(() => {
-      alert('클립보드 복사에 실패했습니다.')
+      showMessage('error', '클립보드 복사에 실패했습니다.')
     })
   }
 
@@ -213,6 +231,28 @@ export default function AgentManagement() {
           </div>
         </div>
       </div>
+
+      {/* 상태 메시지 */}
+      {statusMessage.text && (
+        <div style={{
+          position: 'fixed',
+          top: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          padding: '15px 25px',
+          borderRadius: '10px',
+          background: statusMessage.type === 'success' ? 
+            'linear-gradient(135deg, #28a745, #20c997)' : 
+            'linear-gradient(135deg, #dc3545, #e74c3c)',
+          color: 'white',
+          fontWeight: 'bold',
+          boxShadow: '0 5px 20px rgba(0,0,0,0.3)',
+          animation: 'slideDown 0.3s ease-out'
+        }}>
+          {statusMessage.text}
+        </div>
+      )}
 
       {/* 메인 컨텐츠 */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
@@ -613,6 +653,16 @@ export default function AgentManagement() {
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        @keyframes slideDown {
+          0% { 
+            transform: translate(-50%, -20px);
+            opacity: 0;
+          }
+          100% { 
+            transform: translate(-50%, 0);
+            opacity: 1;
+          }
         }
         @media (max-width: 768px) {
           .grid {

@@ -20,100 +20,32 @@ export default function HomePage() {
 
   const loadRealTimeStats = async () => {
     try {
-      // localStorage에서 실제 에이전트 데이터 가져오기
-      const savedAgents = JSON.parse(localStorage.getItem('mockAgents') || '[]')
+      // 실제 API에서 대시보드 통계 가져오기
+      const response = await fetch('/api/stats/dashboard')
       
-      // 11월 통계 계산을 위한 더미 데이터 생성 (상세통계와 동일한 로직)
-      const generateNovemberStats = () => {
-        const agents = [
-          { agentId: 'Ab3kM9', name: '김철수' },
-          { agentId: 'Xy7nP2', name: '이영희' },
-          { agentId: 'Mn8kL4', name: '박민수' },
-          { agentId: 'Qw9rT5', name: '정미영' },
-          { agentId: 'Er6yU8', name: '최동훈' },
-          { agentId: 'Ty3iO1', name: '한지수' },
-          { agentId: 'Ui7pA4', name: '송민호' },
-          { agentId: 'Op2sD6', name: '윤서연' },
-          { agentId: 'As5dF7', name: '강혜진' },
-          { agentId: 'Gh8jK2', name: '조성민' },
-          { agentId: 'Lm4nB9', name: '신유리' },
-          { agentId: 'Cv6xZ3', name: '홍준석' },
-          { agentId: 'Bn7mQ1', name: '류소영' },
-          { agentId: 'Wq2eR8', name: '임태현' },
-          { agentId: 'Rt5yU4', name: '안미경' },
-          { agentId: 'Pl9oI6', name: '서준호' },
-          { agentId: 'Zx3cV0', name: '김나연' },
-          { agentId: 'Nm1bG5', name: '박상우' },
-          { agentId: 'Hj8kL7', name: '이수진' },
-          { agentId: 'Fd4sA2', name: '최민재' }
-        ]
-
-        let totalQuotes = 0
-        let totalClicks = 0
-
-        agents.forEach(agent => {
-          // 11월 견적요청 수 계산 (상세통계와 동일한 로직)
-          const baseQuotes = agent.name === '류소영' ? 20 :
-                            agent.name === '김철수' ? 15 :
-                            agent.name === '이영희' ? 12 :
-                            agent.name === '임태현' ? 3 :
-                            8
-
-          const seed = agent.agentId.charCodeAt(0) + agent.agentId.charCodeAt(1) + 11 // 11월
-          const variation = (seed % 7) - 3
-          const monthlyQuotes = Math.max(0, baseQuotes + variation)
-
-          // 접속수 계산
-          const clickMultiplier = agent.name === '류소영' ? 5 :
-                                 agent.name === '김철수' ? 7 :
-                                 agent.name === '임태현' ? 15 :
-                                 8
-          const monthlyClicks = Math.max(1, monthlyQuotes * clickMultiplier)
-
-          totalQuotes += monthlyQuotes
-          totalClicks += monthlyClicks
+      if (response.ok) {
+        const result = await response.json()
+        
+        // 실제 통계 데이터 설정
+        setStats({
+          totalAgents: result.stats.totalAgents,
+          totalClicks: result.stats.totalClicks,
+          totalQuotes: result.stats.totalQuotes,
+          conversionRate: result.stats.conversionRate
         })
-
-        return {
-          totalAgents: Math.max(savedAgents.length, agents.length),
-          totalClicks,
-          totalQuotes,
-          conversionRate: totalClicks > 0 ? ((totalQuotes / totalClicks) * 100).toFixed(1) : 0
-        }
+        
+        // 최근 견적요청 설정
+        setRecentQuotes(result.recentQuotes || [])
+        
+        setLoading(false)
+        return
+      } else {
+        // API 호출 실패시 빈 데이터로 설정
+        throw new Error('Dashboard API 호출 실패')
       }
 
-      const novemberStats = generateNovemberStats()
-      setStats(novemberStats)
-
-      // 최근 견적요청 예시 데이터 (실제 견적이 들어왔을 때 모습)
-      const sampleQuotes = [
-        {
-          id: 'quote_001',
-          customer_name: '김민수',
-          customer_phone: '010-1234-5678',
-          svc_type: '간판',
-          area: '서울 강남구',
-          agent_id: 'Ab3kM9',
-          agent_name: '김철수',
-          created_at: new Date().toISOString(), // 방금 전
-          estimated_value: 850000
-        },
-        {
-          id: 'quote_002', 
-          customer_name: '박영희',
-          customer_phone: '010-9876-5432',
-          svc_type: '현수막',
-          area: '부산 해운대구',
-          agent_id: 'Xy7nP2',
-          agent_name: '이영희',
-          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2시간 전
-          estimated_value: 1200000
-        }
-      ]
-      setRecentQuotes(sampleQuotes)
-
     } catch (error) {
-      console.error('11월 통계 로드 오류:', error)
+      console.error('통계 로드 오류:', error)
       // 에러 시 0으로 초기화
       setStats({ totalAgents: 0, totalClicks: 0, totalQuotes: 0, conversionRate: 0 })
       setRecentQuotes([])
@@ -122,66 +54,9 @@ export default function HomePage() {
     }
   }
 
-  // 에이전트 클릭 핸들러
+  // 에이전트 클릭 핸들러 (현재 비활성화 - 실제 에이전트 생성 후 활성화)
   const handleAgentClick = (agentName) => {
-    // 상세통계와 동일한 로직으로 에이전트 정보 생성
-    const agents = [
-      { agentId: 'Ab3kM9', name: '김철수' },
-      { agentId: 'Xy7nP2', name: '이영희' },
-      { agentId: 'Mn8kL4', name: '박민수' },
-      { agentId: 'Qw9rT5', name: '정미영' },
-      { agentId: 'Er6yU8', name: '최동훈' },
-      { agentId: 'Ty3iO1', name: '한지수' },
-      { agentId: 'Ui7pA4', name: '송민호' },
-      { agentId: 'Op2sD6', name: '윤서연' },
-      { agentId: 'As5dF7', name: '강혜진' },
-      { agentId: 'Gh8jK2', name: '조성민' },
-      { agentId: 'Lm4nB9', name: '신유리' },
-      { agentId: 'Cv6xZ3', name: '홍준석' },
-      { agentId: 'Bn7mQ1', name: '류소영' },
-      { agentId: 'Wq2eR8', name: '임태현' },
-      { agentId: 'Rt5yU4', name: '안미경' }
-    ]
-
-    const agent = agents.find(a => a.name === agentName)
-    if (!agent) return
-
-    // 6개월 통계 생성 (6월~11월)
-    const monthlyStats = []
-    for (let month = 6; month <= 11; month++) {
-      const baseQuotes = agent.name === '류소영' ? 20 :
-                        agent.name === '김철수' ? 15 :
-                        agent.name === '이영희' ? 12 :
-                        agent.name === '임태현' ? 3 :
-                        8
-
-      const seed = agent.agentId.charCodeAt(0) + agent.agentId.charCodeAt(1) + month
-      const variation = (seed % 7) - 3
-      const monthlyQuotes = Math.max(0, baseQuotes + variation)
-
-      monthlyStats.push({
-        month: `2025-${month.toString().padStart(2, '0')}`,
-        quotes: monthlyQuotes
-      })
-    }
-
-    // 현재 월 (11월) 성과
-    const currentMonthQuotes = monthlyStats[5].quotes // 11월 데이터
-    const clickMultiplier = agent.name === '류소영' ? 5 :
-                           agent.name === '김철수' ? 7 :
-                           agent.name === '임태현' ? 15 :
-                           8
-    const currentMonthClicks = Math.max(1, currentMonthQuotes * clickMultiplier)
-
-    setSelectedAgent({
-      agentId: agent.agentId,
-      name: agent.name,
-      quotes: currentMonthQuotes,
-      clicks: currentMonthClicks,
-      commission: currentMonthQuotes * 10000,
-      monthlyStats: monthlyStats
-    })
-    setShowAgentModal(true)
+    console.log('에이전트 상세보기 기능은 실제 에이전트 생성 후 활성화됩니다:', agentName)
   }
 
   return (
@@ -297,7 +172,7 @@ export default function HomePage() {
               justifyContent: 'center',
               fontWeight: 'bold'
             }}>📈</span>
-            이번 달 통계 (11월)
+            이번 달 통계 ({new Date().toLocaleDateString('ko-KR', { month: 'long' })})
           </h2>
 
           <div style={{
@@ -413,336 +288,209 @@ export default function HomePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr style={{ background: 'white', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', fontWeight: 'bold', color: '#ffd700' }}>🥇 1위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#4facfe', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>김</div>
-                          <span 
-                            style={{ fontWeight: 'bold', cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('김철수')}
-                          >김철수</span>
-                        </div>
+                    {stats.totalQuotes === 0 ? (
+                    <tr>
+                      <td colSpan="3" style={{ 
+                        padding: '40px', 
+                        textAlign: 'center', 
+                        color: '#666',
+                        fontStyle: 'italic'
+                      }}>
+                        아직 견적요청이 없습니다.<br/>
+                        에이전트를 생성하고 추적을 시작하세요!
                       </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#28a745' }}>5건</td>
                     </tr>
-                    <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', fontWeight: 'bold', color: '#c0c0c0' }}>🥈 2위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#11998e', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>이</div>
-                          <span 
-                            style={{ fontWeight: 'bold', cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('이영희')}
-                          >이영희</span>
-                        </div>
+                    ) : (
+                      // 실제 데이터가 있으면 여기서 표시 (나중에 구현)
+                      <tr>
+                        <td colSpan="3" style={{ 
+                          padding: '40px', 
+                          textAlign: 'center', 
+                          color: '#666',
+                          fontStyle: 'italic'
+                        }}>
+                          에이전트별 견적요청 통계가 여기에 표시됩니다.
                       </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#28a745' }}>4건</td>
                     </tr>
-                    <tr style={{ background: 'white', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', fontWeight: 'bold', color: '#cd7f32' }}>🥉 3위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#667eea', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>류</div>
-                          <span 
-                            style={{ fontWeight: 'bold', cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('류소영')}
-                          >류소영</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#28a745' }}>3건</td>
-                    </tr>
-                    <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#666' }}>4위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#fd79a8', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>박</div>
-                          <span 
-                            style={{ cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('박민수')}
-                          >박민수</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', color: '#28a745' }}>2건</td>
-                    </tr>
-                    <tr style={{ background: 'white', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#666' }}>5위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#74b9ff', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>정</div>
-                          <span 
-                            style={{ cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('정미영')}
-                          >정미영</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', color: '#28a745' }}>2건</td>
-                    </tr>
-                    <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#666' }}>6위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#a29bfe', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>최</div>
-                          <span 
-                            style={{ cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('최동훈')}
-                          >최동훈</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', color: '#28a745' }}>1건</td>
-                    </tr>
-                    <tr style={{ background: 'white', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#666' }}>7위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#fd79a8', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>한</div>
-                          <span 
-                            style={{ cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('한지수')}
-                          >한지수</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', color: '#28a745' }}>1건</td>
-                    </tr>
-                    <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#666' }}>8위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#00b894', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'white', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>송</div>
-                          <span 
-                            style={{ cursor: 'pointer', color: '#007bff' }}
-                            onClick={() => handleAgentClick('송민호')}
-                          >송민호</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', fontWeight: 'bold', color: '#28a745' }}>1건</td>
-                    </tr>
-                    <tr style={{ background: 'white', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#999' }}>9위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#ddd', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#666', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>윤</div>
-                          <span 
-                            style={{ color: '#007bff', cursor: 'pointer' }}
-                            onClick={() => handleAgentClick('윤서연')}
-                          >윤서연</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', color: '#999' }}>0건</td>
-                    </tr>
-                    <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#999' }}>10위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#ddd', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#666', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>강</div>
-                          <span 
-                            style={{ color: '#007bff', cursor: 'pointer' }}
-                            onClick={() => handleAgentClick('강혜진')}
-                          >강혜진</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', color: '#999' }}>0건</td>
-                    </tr>
-                    <tr style={{ background: 'white', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#999' }}>11위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#ddd', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#666', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>조</div>
-                          <span 
-                            style={{ color: '#007bff', cursor: 'pointer' }}
-                            onClick={() => handleAgentClick('조성민')}
-                          >조성민</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', color: '#999' }}>0건</td>
-                    </tr>
-                    <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#999' }}>12위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#ddd', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#666', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>신</div>
-                          <span 
-                            style={{ color: '#007bff', cursor: 'pointer' }}
-                            onClick={() => handleAgentClick('신유리')}
-                          >신유리</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', color: '#999' }}>0건</td>
-                    </tr>
-                    <tr style={{ background: 'white', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#999' }}>13위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#ddd', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#666', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>홍</div>
-                          <span 
-                            style={{ color: '#007bff', cursor: 'pointer' }}
-                            onClick={() => handleAgentClick('홍준석')}
-                          >홍준석</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', color: '#999' }}>0건</td>
-                    </tr>
-                    <tr style={{ background: '#f8f9fa', borderBottom: '1px solid #f1f3f4' }}>
-                      <td style={{ padding: '12px 15px', color: '#999' }}>14위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#ddd', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#666', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>임</div>
-                          <span 
-                            style={{ color: '#007bff', cursor: 'pointer' }}
-                            onClick={() => handleAgentClick('임태현')}
-                          >임태현</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', color: '#999' }}>0건</td>
-                    </tr>
-                    <tr style={{ background: 'white' }}>
-                      <td style={{ padding: '12px 15px', color: '#999' }}>15위</td>
-                      <td style={{ padding: '12px 15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '32px', height: '32px', background: '#ddd', borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#666', fontWeight: 'bold', fontSize: '0.9rem'
-                          }}>안</div>
-                          <span 
-                            style={{ color: '#007bff', cursor: 'pointer' }}
-                            onClick={() => handleAgentClick('안미경')}
-                          >안미경</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 15px', textAlign: 'center', color: '#999' }}>0건</td>
-                    </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
 
-              {/* 총합 요약 */}
-              <div style={{
-                padding: '15px 20px',
-                background: '#e3f2fd',
-                borderRadius: '0 0 12px 12px',
-                textAlign: 'center',
-                color: '#1976d2',
-                borderTop: '2px solid #bbdefb'
-              }}>
-                💡 오늘 총 <strong>19건</strong>의 견적요청이 접수되었습니다 (활성 에이전트: 8명)
-              </div>
+              {/* 총합 요약 - 실제 데이터 기반 */}
+              {stats.totalQuotes > 0 && (
+                <div style={{
+                  padding: '15px 20px',
+                  background: 'linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%)',
+                  borderTop: '2px solid #28a745',
+                  borderRadius: '0 0 12px 12px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    fontWeight: 'bold',
+                    color: '#155724',
+                    fontSize: '1rem'
+                  }}>
+                    <span>💡</span>
+                    <span>오늘 총 {stats.totalQuotes}건의 견적요청이 접수되었습니다 (활성 에이전트: {stats.totalAgents}명)</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* CTA 버튼 */}
-          <div style={{ textAlign: 'center', marginTop: '40px' }}>
+        {/* 빠른 액션 버튼 */}
+        <div style={{
+          padding: '30px'
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '20px'
+          }}>
+            <Link href="/admin/agents" style={{ textDecoration: 'none' }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                padding: '30px',
+                textAlign: 'center',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease',
+                border: '1px solid rgba(79, 172, 254, 0.2)'
+              }}>
+                <div style={{
+                  fontSize: '48px',
+                  marginBottom: '15px'
+                }}>👥</div>
+                <h3 style={{
+                  margin: '0 0 10px 0',
+                  color: '#2c3e50',
+                  fontSize: '1.3rem'
+                }}>에이전트 관리</h3>
+                <p style={{
+                  margin: 0,
+                  color: '#7f8c8d',
+                  fontSize: '0.9rem'
+                }}>새 에이전트 생성 및 관리</p>
+              </div>
+            </Link>
+
+            <Link href="/admin/analytics" style={{ textDecoration: 'none' }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                padding: '30px',
+                textAlign: 'center',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease',
+                border: '1px solid rgba(17, 153, 142, 0.2)'
+              }}>
+                <div style={{
+                  fontSize: '48px',
+                  marginBottom: '15px'
+                }}>📊</div>
+                <h3 style={{
+                  margin: '0 0 10px 0',
+                  color: '#2c3e50',
+                  fontSize: '1.3rem'
+                }}>상세 통계</h3>
+                <p style={{
+                  margin: 0,
+                  color: '#7f8c8d',
+                  fontSize: '0.9rem'
+                }}>월별/일별 상세 분석</p>
+              </div>
+            </Link>
+
+            <Link href="/admin/settlement" style={{ textDecoration: 'none' }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                padding: '30px',
+                textAlign: 'center',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                cursor: 'pointer',
+                transition: 'transform 0.2s ease',
+                border: '1px solid rgba(253, 121, 168, 0.2)'
+              }}>
+                <div style={{
+                  fontSize: '48px',
+                  marginBottom: '15px'
+                }}>💰</div>
+                <h3 style={{
+                  margin: '0 0 10px 0',
+                  color: '#2c3e50',
+                  fontSize: '1.3rem'
+                }}>정산 관리</h3>
+                <p style={{
+                  margin: 0,
+                  color: '#7f8c8d',
+                  fontSize: '0.9rem'
+                }}>월별 커미션 정산</p>
+            </div>
+            </Link>
+          </div>
+
+          {stats.totalAgents === 0 && (
+            <div style={{
+              marginTop: '40px',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '16px',
+              padding: '40px',
+              textAlign: 'center',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+              border: '2px dashed #4facfe'
+            }}>
+              <div style={{
+                fontSize: '64px',
+                marginBottom: '20px'
+              }}>🚀</div>
+              <h2 style={{
+                margin: '0 0 15px 0',
+                color: '#2c3e50',
+                fontSize: '1.8rem'
+              }}>Ganpoom 트래킹 시작하기</h2>
+              <p style={{
+                margin: '0 0 30px 0',
+                color: '#7f8c8d',
+                fontSize: '1rem',
+                lineHeight: 1.6
+              }}>
+                아직 등록된 에이전트가 없습니다.<br/>
+                첫 번째 에이전트를 생성해서 추적을 시작하세요!
+              </p>
             <Link href="/admin/agents" style={{ textDecoration: 'none' }}>
               <button style={{
                 padding: '15px 40px',
                 background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '25px',
-                fontSize: '1.1rem',
+                  borderRadius: '12px',
+                  fontSize: '16px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                transition: 'all 0.3s',
-                boxShadow: '0 4px 15px rgba(79, 172, 254, 0.3)',
-                marginRight: '15px'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 8px 25px rgba(79, 172, 254, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 4px 15px rgba(79, 172, 254, 0.3)';
+                  transition: 'transform 0.2s ease',
+                  boxShadow: '0 4px 15px rgba(79, 172, 254, 0.4)'
               }}>
                 ✨ 첫 에이전트 생성하기
               </button>
             </Link>
-
-            <Link href="/test-ganpoom" style={{ textDecoration: 'none' }}>
-              <button style={{
-                padding: '15px 40px',
-                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '25px',
-                fontSize: '1.1rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                boxShadow: '0 4px 15px rgba(240, 147, 251, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 8px 25px rgba(240, 147, 251, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 4px 15px rgba(240, 147, 251, 0.3)';
-              }}>
-                🧪 시스템 테스트하기
-              </button>
-            </Link>
           </div>
+          )}
         </div>
       </div>
 
-      {/* 에이전트 상세 모달 */}
+      {/* 에이전트 상세 모달 (비활성화) */}
       {showAgentModal && selectedAgent && (
         <div style={{
           position: 'fixed',
@@ -832,7 +580,7 @@ export default function HomePage() {
               padding: '20px',
               marginBottom: '25px'
             }}>
-              <h3 style={{ margin: '0 0 15px 0', color: '#2e7d32' }}>📊 이번 달 성과 (11월)</h3>
+              <h3 style={{ margin: '0 0 15px 0', color: '#2e7d32' }}>📊 이번 달 성과 ({new Date().toLocaleDateString('ko-KR', { month: 'long' })})</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', textAlign: 'center' }}>
                 <div>
                   <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4facfe' }}>{selectedAgent.clicks}</div>
