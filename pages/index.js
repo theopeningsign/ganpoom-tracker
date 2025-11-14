@@ -2,16 +2,28 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import PasswordProtection from '../components/PasswordProtection'
 
-export default function HomePage() {
-  const [stats, setStats] = useState({
+export default function HomePage({
+  initialStats,
+  initialRecentQuotes,
+  initialTodayQuotes
+}) {
+  const defaultStats = initialStats || {
     totalAgents: 0,
     totalClicks: 0,
     totalQuotes: 0,
     conversionRate: 0
+  }
+
+  const [stats, setStats] = useState(defaultStats)
+  const [recentQuotes, setRecentQuotes] = useState(initialRecentQuotes || [])
+  const [todayQuotes, setTodayQuotes] = useState(initialTodayQuotes || [])
+  const [agentModal, setAgentModal] = useState({
+    open: false,
+    loading: false,
+    data: null,
+    error: ''
   })
-  const [recentQuotes, setRecentQuotes] = useState([])
-  const [todayQuotes, setTodayQuotes] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialStats)
 
   useEffect(() => {
     loadRealTimeStats()
@@ -50,9 +62,32 @@ export default function HomePage() {
       // 에러 시 0으로 초기화
       setStats({ totalAgents: 0, totalClicks: 0, totalQuotes: 0, conversionRate: 0 })
       setRecentQuotes([])
+      setTodayQuotes([])
     } finally {
       setLoading(false)
     }
+  }
+
+  const openAgentModal = async (agentId) => {
+    setAgentModal({ open: true, loading: true, data: null, error: '' })
+    try {
+      const response = await fetch(`/api/agents/detail?id=${agentId}`)
+      if (!response.ok) {
+        throw new Error('에이전트 정보를 불러오는데 실패했습니다.')
+      }
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || '에이전트 정보를 찾을 수 없습니다.')
+      }
+      setAgentModal({ open: true, loading: false, data: result.agent, error: '' })
+    } catch (error) {
+      console.error('에이전트 모달 로드 실패:', error)
+      setAgentModal({ open: true, loading: false, data: null, error: error.message || '에러가 발생했습니다.' })
+    }
+  }
+
+  const closeAgentModal = () => {
+    setAgentModal({ open: false, loading: false, data: null, error: '' })
   }
 
 
@@ -285,7 +320,7 @@ export default function HomePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {todayQuotes.length === 0 ? (
+                      {todayQuotes.length === 0 ? (
                     <tr>
                       <td colSpan="3" style={{ 
                         padding: '40px', 
@@ -299,13 +334,17 @@ export default function HomePage() {
                     </tr>
                     ) : (
                       todayQuotes.map((agent, index) => (
-                        <tr key={agent.agentId}>
+                        <tr
+                          key={agent.agentId}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => openAgentModal(agent.agentId)}
+                        >
                           <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef' }}>{index + 1}</td>
-                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef' }}>{agent.name}</td>
+                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef', color: '#007bff', fontWeight: 'bold' }}>{agent.name}</td>
                           <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef', textAlign: 'center', fontWeight: 'bold' }}>
                             {agent.quotes}
-                          </td>
-                        </tr>
+                      </td>
+                    </tr>
                       ))
                     )}
                   </tbody>
@@ -497,6 +536,155 @@ export default function HomePage() {
         }
       `}</style>
     </div>
+      {agentModal.open && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}
+        onClick={closeAgentModal}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '30px',
+              maxWidth: '500px',
+            width: '90%',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+            maxHeight: '80vh',
+              overflowY: 'auto'
+            }}
+          >
+            <h3 style={{ marginTop: 0, color: '#333', marginBottom: '20px' }}>에이전트 상세 정보</h3>
+            {agentModal.loading ? (
+              <p>불러오는 중...</p>
+            ) : agentModal.error ? (
+              <p style={{ color: 'red' }}>{agentModal.error}</p>
+            ) : agentModal.data ? (
+              <>
+                <div style={{ marginBottom: '15px' }}>
+                  <strong>이름:</strong> {agentModal.data.name}
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <strong>전화번호:</strong> {agentModal.data.phone}
+                </div>
+                {agentModal.data.email && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <strong>이메일:</strong> {agentModal.data.email}
+                  </div>
+                )}
+                <div style={{ marginBottom: '15px' }}>
+                  <strong>계좌번호:</strong> {agentModal.data.account_number || '미등록'}
+                </div>
+                {agentModal.data.memo && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <strong>메모:</strong> {agentModal.data.memo}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                  <div style={{
+                    flex: 1,
+                    background: '#e3f2fd',
+                    borderRadius: '12px',
+                    padding: '15px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1976d2' }}>
+                      {agentModal.data.totalClicks || 0}
+                </div>
+                    <div style={{ fontSize: '0.9rem', color: '#666' }}>총 접속수</div>
+              </div>
+                  <div style={{
+                    flex: 1,
+                    background: '#fff3e0',
+                    borderRadius: '12px',
+                    padding: '15px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f57c00' }}>
+                      {agentModal.data.totalQuotes || 0}
+              </div>
+                    <div style={{ fontSize: '0.9rem', color: '#666' }}>총 견적요청</div>
+            </div>
+            <div style={{
+                    flex: 1,
+              background: '#e8f5e8',
+              borderRadius: '12px',
+                    padding: '15px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2e7d32' }}>
+                      {agentModal.data.todayQuotes || 0}
+                </div>
+                    <div style={{ fontSize: '0.9rem', color: '#666' }}>오늘 견적요청</div>
+                  </div>
+                </div>
+              <button
+                  onClick={closeAgentModal}
+                style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                  color: 'white',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                닫기
+              </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </PasswordProtection>
   )
+}
+
+export async function getServerSideProps(context) {
+  const protocol = context.req.headers['x-forwarded-proto'] || 'http'
+  const host = context.req.headers['host']
+
+  try {
+    const response = await fetch(`${protocol}://${host}/api/stats/dashboard`, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      cache: 'no-store'
+    })
+
+    if (!response.ok) {
+      throw new Error('Dashboard API 호출 실패')
+    }
+
+    const result = await response.json()
+
+    return {
+      props: {
+        initialStats: result.stats || null,
+        initialRecentQuotes: result.recentQuotes || [],
+        initialTodayQuotes: result.todayQuotes || []
+      }
+    }
+  } catch (error) {
+    console.error('SSR 대시보드 로드 오류:', error)
+    return {
+      props: {
+        initialStats: null,
+        initialRecentQuotes: [],
+        initialTodayQuotes: []
+      }
+    }
+  }
 }

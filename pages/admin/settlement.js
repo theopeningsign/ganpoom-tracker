@@ -49,16 +49,17 @@ export default function SettlementPage() {
         newYear = year - 1
       }
     } else if (direction === 'next') {
-      // 현재 정산월을 넘어갈 수 없음
-      const [currentYear, currentSettlementMonth] = settlementMonth.split('-').map(Number)
-      if (year < currentYear || (year === currentYear && month < currentSettlementMonth)) {
+      const now = new Date()
+      const currentYear = now.getFullYear()
+      const currentMonth = now.getMonth() + 1
+      if (year < currentYear || (year === currentYear && month < currentMonth)) {
         newMonth = month + 1
         if (newMonth > 12) {
           newMonth = 1
           newYear = year + 1
         }
       } else {
-        return // 현재 정산월이면 다음으로 갈 수 없음
+        return // 현재월을 넘어갈 수 없음
       }
     }
     
@@ -69,9 +70,11 @@ export default function SettlementPage() {
 
   const canNavigateNext = () => {
     const [viewYear, viewMonth] = viewingMonth.split('-').map(Number)
-    const [settleYear, settleMonth] = settlementMonth.split('-').map(Number)
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1
     
-    return viewYear < settleYear || (viewYear === settleYear && viewMonth < settleMonth)
+    return viewYear < currentYear || (viewYear === currentYear && viewMonth < currentMonth)
   }
 
   const canNavigatePrev = () => {
