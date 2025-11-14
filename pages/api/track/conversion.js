@@ -27,10 +27,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Agent ID and form data are required' })
     }
 
-    // 에이전트 정보 조회
+    // 에이전트 정보 조회 (name 포함)
     const { data: agent, error: agentError } = await supabaseAdmin
       .from('agents')
-      .select('id, is_active')
+      .select('id, name, is_active')
       .eq('id', agentId)
       .eq('is_active', true)
       .single()

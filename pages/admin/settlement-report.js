@@ -92,7 +92,7 @@ export default function SettlementReportPage() {
     return viewYear > 2025 || (viewYear === 2025 && viewMonth > 1)
   }
 
-  const loadReportData = (targetMonth) => {
+  const loadReportData = async (targetMonth) => {
     try {
       setLoading(true)
       
@@ -110,32 +110,35 @@ export default function SettlementReportPage() {
       // 선택된 월 파싱
       const [selectedYear, selectedMonthNum] = targetMonth.split('-').map(Number)
       
-      // 1월부터 선택된 월까지 데이터 생성
-      const reports = []
+      // 실제 API에서 월별 통계 가져오기
+      const response = await fetch(`/api/stats/monthly-report?year=${selectedYear}&endMonth=${selectedMonthNum}`)
       
-      for (let month = 1; month <= selectedMonthNum; month++) {
-        const monthStr = `${selectedYear}-${month.toString().padStart(2, '0')}`
+      if (response.ok) {
+        const result = await response.json()
         
-        // 해당 월의 통계 계산
-        const monthlyStats = calculateMonthlyStats(month)
-        
-        reports.push({
-          month: monthStr,
-          monthName: `${month}월`,
-          year: selectedYear,
-          isCurrentSettlement: monthStr === targetMonth, // 선택된 월이 현재 보고 있는 정산월
-          ...monthlyStats
-        })
+        if (result.success && result.reports) {
+          // 현재 정산월 표시를 위해 isCurrentSettlement 추가
+          const reports = result.reports.map(report => ({
+            ...report,
+            isCurrentSettlement: report.month === targetMonth
+          }))
+          
+          setReportData(reports)
+          
+          // 스크롤을 현재 보고 있는 월로 이동
+          setTimeout(() => {
+            scrollToCurrentMonth(targetMonth)
+          }, 100)
+        } else {
+          throw new Error('월별 실적표 데이터 형식 오류')
+        }
+      } else {
+        throw new Error('월별 실적표 API 호출 실패')
       }
-      
-      setReportData(reports)
-      
-      // 스크롤을 현재 보고 있는 월로 이동
-      setTimeout(() => {
-        scrollToCurrentMonth(targetMonth)
-      }, 100)
     } catch (error) {
       console.error('정산 실적표 로드 오류:', error)
+      // 실패시 빈 배열로 설정
+      setReportData([])
     } finally {
       setLoading(false)
     }
@@ -157,73 +160,6 @@ export default function SettlementReportPage() {
     }
   }
 
-  const calculateMonthlyStats = (monthNum) => {
-    // 에이전트 목록
-    const agents = [
-      { agentId: 'Ab3kM9', name: '김철수' },
-      { agentId: 'Xy7nP2', name: '이영희' },
-      { agentId: 'Mn8kL4', name: '박민수' },
-      { agentId: 'Qw9rT5', name: '정미영' },
-      { agentId: 'Er6yU8', name: '최동훈' },
-      { agentId: 'Ty3iO1', name: '한지수' },
-      { agentId: 'Ui7pA4', name: '송민호' },
-      { agentId: 'Op2sD6', name: '윤서연' },
-      { agentId: 'As5dF7', name: '강혜진' },
-      { agentId: 'Gh8jK2', name: '조성민' },
-      { agentId: 'Lm4nB9', name: '신유리' },
-      { agentId: 'Cv6xZ3', name: '홍준석' },
-      { agentId: 'Bn7mQ1', name: '류소영' },
-      { agentId: 'Wq2eR8', name: '임태현' },
-      { agentId: 'Rt5yU4', name: '안미경' }
-    ]
-
-    let totalClicks = 0
-    let totalQuotes = 0
-    let totalCommission = 0
-    let activeAgents = 0
-
-    agents.forEach(agent => {
-      // 월별 견적요청 수 계산 (상세통계와 동일한 로직)
-      const baseQuotes = agent.name === '류소영' ? 20 :
-                        agent.name === '김철수' ? 15 :
-                        agent.name === '이영희' ? 12 :
-                        agent.name === '임태현' ? 3 :
-                        8
-
-      const seed = agent.agentId.charCodeAt(0) + agent.agentId.charCodeAt(1) + monthNum
-      const variation = (seed % 7) - 3
-      const monthlyQuotes = Math.max(0, baseQuotes + variation)
-
-      if (monthlyQuotes > 0) {
-        activeAgents++
-        
-        // 접속수 계산
-        const clickMultiplier = agent.name === '류소영' ? 5 :
-                               agent.name === '김철수' ? 7 :
-                               agent.name === '임태현' ? 15 :
-                               8
-        const monthlyClicks = Math.max(1, monthlyQuotes * clickMultiplier)
-
-        // 단가 계산
-        const unitPrice = agent.name === '류소영' ? 12000 :
-                         agent.name === '김철수' ? 11000 :
-                         agent.name === '임태현' ? 8000 :
-                         10000
-
-        totalClicks += monthlyClicks
-        totalQuotes += monthlyQuotes
-        totalCommission += monthlyQuotes * unitPrice
-      }
-    })
-
-    return {
-      totalClicks,
-      totalQuotes,
-      totalCommission,
-      activeAgents,
-      conversionRate: totalClicks > 0 ? ((totalQuotes / totalClicks) * 100).toFixed(1) : 0
-    }
-  }
 
   if (loading) {
     return (

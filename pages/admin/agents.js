@@ -450,6 +450,9 @@ export default function AgentManagement() {
                       
                       <div style={{ color: '#666', fontSize: '0.95rem', lineHeight: '1.5' }}>
                         <p style={{ margin: '5px 0' }}>📞 {agent.phone}</p>
+                        {agent.email && (
+                          <p style={{ margin: '5px 0' }}>📧 {agent.email}</p>
+                        )}
                         <p style={{ margin: '5px 0' }}>🏦 {agent.account_number || '계좌번호 미등록'}</p>
                         <p style={{ margin: '5px 0' }}>🆔 {agent.id}</p>
                         {agent.memo && (

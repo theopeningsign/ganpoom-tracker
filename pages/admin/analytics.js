@@ -56,8 +56,15 @@ export default function AnalyticsPage() {
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [showAgentModal, setShowAgentModal] = useState(false)
   const [loadingAgentMonthly, setLoadingAgentMonthly] = useState(false)
+  const [statusMessage, setStatusMessage] = useState({ type: '', text: '' })
   const monthlyTableRef = useRef(null)
   const monthlySectionRef = useRef(null)
+
+  // 상태 메시지 표시 함수
+  const showMessage = (type, text) => {
+    setStatusMessage({ type, text })
+    setTimeout(() => setStatusMessage({ type: '', text: '' }), 5000)
+  }
 
   useEffect(() => {
     loadAnalytics()
@@ -194,7 +201,7 @@ export default function AnalyticsPage() {
   // 엑셀 다운로드 함수
   const downloadExcel = () => {
     if (!filteredAgentStats || filteredAgentStats.length === 0) {
-      alert('다운로드할 데이터가 없습니다.')
+      showMessage('error', '다운로드할 데이터가 없습니다.')
       return
     }
 
@@ -335,13 +342,47 @@ export default function AnalyticsPage() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: customScrollbarStyle }} />
+      <style dangerouslySetInnerHTML={{ __html: `
+        ${customScrollbarStyle}
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+      ` }} />
       <div style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         minHeight: '100vh',
         padding: '0'
       }}>
+      {/* 상태 메시지 */}
+      {statusMessage.text && (
+        <div style={{
+          position: 'fixed',
+          top: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          padding: '15px 25px',
+          borderRadius: '10px',
+          background: statusMessage.type === 'success' ? 
+            'linear-gradient(135deg, #28a745, #20c997)' : 
+            'linear-gradient(135deg, #dc3545, #e74c3c)',
+          color: 'white',
+          fontWeight: 'bold',
+          boxShadow: '0 5px 20px rgba(0,0,0,0.3)',
+          animation: 'slideDown 0.3s ease-out'
+        }}>
+          {statusMessage.text}
+        </div>
+      )}
+      
       {/* 헤더 */}
       <div style={{
         background: 'rgba(255, 255, 255, 0.95)',
