@@ -6,10 +6,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { agentId } = req.body
+    const { agentId, name, phone, email, account, account_number, memo } = req.body
 
     if (!agentId) {
       return res.status(400).json({ error: 'Agent ID is required' })
+    }
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: '에이전트 이름은 필수입니다' })
+    }
+
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ error: '전화번호는 필수입니다' })
+    }
+
+    if (!account && !account_number) {
+      return res.status(400).json({ error: '계좌번호는 필수입니다' })
     }
 
     // 에이전트 존재 여부 확인
@@ -23,8 +35,21 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Agent not found' })
     }
 
-    // 업데이트할 필드 구성 (커미션 관련 필드 제거)
+    const trimmedEmail = email && email.trim() ? email.trim() : null
+    if (trimmedEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(trimmedEmail)) {
+        return res.status(400).json({ error: '올바른 이메일 형식을 입력해주세요' })
+      }
+    }
+
+    // 업데이트할 필드 구성
     const updateData = {
+      name: name.trim(),
+      phone: phone.trim(),
+      email: trimmedEmail,
+      account_number: (account || account_number)?.trim() || null,
+      memo: memo && memo.trim() ? memo.trim() : null,
       updated_at: new Date().toISOString()
     }
 
@@ -46,7 +71,6 @@ export default async function handler(req, res) {
       message: 'Agent updated successfully',
       agent: data
     })
-
   } catch (error) {
     console.error('에이전트 업데이트 API 오류:', error)
     res.status(500).json({ error: 'Server error occurred' })

@@ -1,28 +1,117 @@
 import { useState, useEffect } from 'react'
+import * as XLSX from 'xlsx'
 import Link from 'next/link'
 
 export default function AgentManagement() {
-  const [agents, setAgents] = useState([])
-  const [filteredAgents, setFilteredAgents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [sortBy, setSortBy] = useState('created_at')
-  const [viewMode, setViewMode] = useState('grid')
-  const [formData, setFormData] = useState({
+  const initialFormState = {
     name: '',
     phone: '',
     email: '',
     account: '',
     memo: ''
-  })
+  }
+
+  const [agents, setAgents] = useState([])
+  const [filteredAgents, setFilteredAgents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortBy, setSortBy] = useState('created_at')
+  const [viewMode, setViewMode] = useState('grid')
+  const [formData, setFormData] = useState(initialFormState)
+  const [editingAgent, setEditingAgent] = useState(null)
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' }) // 상태 메시지 추가
 
   // 상태 메시지 표시 함수
   const showMessage = (type, text) => {
     setStatusMessage({ type, text })
     setTimeout(() => setStatusMessage({ type: '', text: '' }), 5000) // 5초 후 자동 제거
+  }
+
+  const resetForm = () => {
+    setFormData(initialFormState)
+    setEditingAgent(null)
+  }
+
+  const openCreateForm = () => {
+    resetForm()
+    setShowCreateForm(true)
+  }
+
+  const openEditForm = (agent) => {
+    setFormData({
+      name: agent.name || '',
+      phone: agent.phone || '',
+      email: agent.email || '',
+      account: agent.account_number || '',
+      memo: agent.memo || ''
+    })
+    setEditingAgent(agent)
+    setShowCreateForm(true)
+  }
+
+  const closeFormModal = () => {
+    setShowCreateForm(false)
+    resetForm()
+  }
+
+  const isEditing = Boolean(editingAgent)
+  const listHeaderStyle = {
+    padding: '14px',
+    textAlign: 'left',
+    fontSize: '0.9rem',
+    color: '#495057',
+    borderBottom: '2px solid #dee2e6'
+  }
+  const listCellStyle = {
+    padding: '14px',
+    fontSize: '0.9rem',
+    color: '#495057'
+  }
+  const listActionButtonStyle = (bg) => ({
+    background: bg,
+    color: '#fff',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '0.8rem',
+    padding: '6px 10px',
+    cursor: 'pointer',
+    fontWeight: 'bold'
+  })
+
+  const downloadAgentExcel = () => {
+    if (!filteredAgents.length) {
+      showMessage('error', '다운로드할 에이전트가 없습니다.')
+      return
+    }
+
+    const data = filteredAgents.map((agent) => ({
+      '에이전트명': agent.name,
+      '전화번호': agent.phone,
+      '이메일': agent.email || '',
+      '계좌번호': agent.account_number || '',
+      '에이전트 ID': agent.id,
+      '접속수': agent.clicks || 0,
+      '견적요청': agent.quotes || 0,
+      '가입일': agent.created_at ? new Date(agent.created_at).toLocaleString('ko-KR') : ''
+    }))
+
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.json_to_sheet(data)
+    worksheet['!cols'] = [
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 14 },
+      { wch: 8 },
+      { wch: 10 },
+      { wch: 19 }
+    ]
+    XLSX.utils.book_append_sheet(workbook, worksheet, '에이전트 목록')
+    XLSX.writeFile(workbook, `에이전트_관리_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    showMessage('success', '📁 에이전트 목록 엑셀 다운로드가 완료되었습니다.')
   }
 
   // 에이전트 목록 로드
@@ -97,7 +186,7 @@ export default function AgentManagement() {
     }
   }
 
-  const createAgent = async (e) => {
+  const handleAgentSave = async (e) => {
     e.preventDefault()
     
     if (!formData.name || !formData.phone || !formData.account) {
@@ -106,14 +195,18 @@ export default function AgentManagement() {
     }
 
     try {
-      setCreating(true)
+      setSaving(true)
+      const isEditing = Boolean(editingAgent)
+      const endpoint = isEditing ? '/api/agents/update' : '/api/agents/create'
+      const method = isEditing ? 'PATCH' : 'POST'
+      const payload = isEditing ? { ...formData, agentId: editingAgent.id } : formData
       
-      const response = await fetch('/api/agents/create', {
-        method: 'POST',
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -123,20 +216,27 @@ export default function AgentManagement() {
           throw new Error(result.error || '에이전트 생성 실패')
         }
         
-        // 응답 데이터 구조 확인 (agent 객체 또는 전체 응답)
-        const newAgent = result.agent || result
+        const apiAgent = result.agent || result
         
-        // 로컬 상태 업데이트
-        setAgents(prev => [...prev, newAgent])
+        if (isEditing) {
+          setAgents((prev) =>
+            prev.map((agent) => (agent.id === apiAgent.id ? apiAgent : agent))
+          )
+        } else {
+          setAgents(prev => [...prev, apiAgent])
+        }
         
-        // 폼 초기화
-        setFormData({ name: '', phone: '', email: '', account: '', memo: '' })
-        setShowCreateForm(false)
+        closeFormModal()
         
         // 추적 링크 생성 (응답에 없으면 직접 생성)
-        const trackingLink = result.trackingLink || `https://www.ganpoom.com/?ref=${newAgent.id}`
+        const trackingLink = result.trackingLink || `https://www.ganpoom.com/?ref=${apiAgent.id}`
         
-        showMessage('success', `✅ ${newAgent.name} 에이전트가 생성되었습니다! 추적 링크: ${trackingLink}`)
+        showMessage(
+          'success',
+          isEditing
+            ? `✏️ ${apiAgent.name} 에이전트 정보가 수정되었습니다.`
+            : `✅ ${apiAgent.name} 에이전트가 생성되었습니다! 추적 링크: ${trackingLink}`
+        )
         
         // 에이전트 목록 새로고침
         loadAgents()
@@ -148,14 +248,18 @@ export default function AgentManagement() {
           statusText: response.statusText,
           error: errorData
         })
-        throw new Error(errorData.error || errorData.details || `에이전트 생성 실패 (${response.status})`)
+        throw new Error(
+          errorData.error ||
+            errorData.details ||
+            `에이전트 ${editingAgent ? '수정' : '생성'} 실패 (${response.status})`
+        )
       }
     } catch (error) {
-      console.error('에이전트 생성 실패:', error)
-      const errorMessage = error.message || '에이전트 생성에 실패했습니다.'
+      console.error('에이전트 저장 실패:', error)
+      const errorMessage = error.message || '에이전트 저장에 실패했습니다.'
       showMessage('error', errorMessage)
     } finally {
-      setCreating(false)
+      setSaving(false)
     }
   }
 
@@ -372,9 +476,50 @@ export default function AgentManagement() {
                 <option value="quotes">견적요청순</option>
               </select>
 
+              {/* 보기 전환 */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {[
+                  { key: 'grid', label: '카드형' },
+                  { key: 'list', label: '목록형' }
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setViewMode(key)}
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      border: '2px solid',
+                      borderColor: viewMode === key ? '#4facfe' : '#e1e5e9',
+                      background: viewMode === key ? 'rgba(79, 172, 254, 0.15)' : 'white',
+                      color: viewMode === key ? '#0b5ed7' : '#333',
+                      fontWeight: viewMode === key ? 700 : 500,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* 엑셀 다운로드 */}
+              <button
+                onClick={downloadAgentExcel}
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                📥 엑셀 다운로드
+              </button>
+
               {/* 에이전트 생성 버튼 */}
               <button
-                onClick={() => setShowCreateForm(true)}
+                onClick={openCreateForm}
                 style={{
                   padding: '12px 24px',
                   background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
@@ -391,23 +536,31 @@ export default function AgentManagement() {
             </div>
 
             {/* 에이전트 목록 */}
-            {filteredAgents.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '60px 20px',
-                color: '#666'
-              }}>
-                <div style={{ fontSize: '4rem', marginBottom: '20px' }}>👥</div>
-                <h3 style={{ marginBottom: '10px' }}>아직 등록된 에이전트가 없습니다</h3>
-                <p>새 에이전트를 추가해보세요!</p>
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                gap: '20px'
-              }}>
-                {filteredAgents.map((agent) => (
+            <div
+              style={{
+                maxHeight: viewMode === 'grid' ? '1100px' : '900px',
+                overflowY: 'auto',
+                paddingRight: '6px'
+              }}
+              className="custom-scrollbar agent-scroll"
+            >
+              {filteredAgents.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  color: '#666'
+                }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '20px' }}>👥</div>
+                  <h3 style={{ marginBottom: '10px' }}>아직 등록된 에이전트가 없습니다</h3>
+                  <p>새 에이전트를 추가해보세요!</p>
+                </div>
+              ) : viewMode === 'grid' ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                  gap: '20px'
+                }}>
+                  {filteredAgents.map((agent) => (
                   <div
                     key={agent.id}
                     style={{
@@ -429,26 +582,44 @@ export default function AgentManagement() {
                   >
                     {/* 에이전트 정보 */}
                     <div style={{ marginBottom: '20px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '12px' }}>
                         <h3 style={{ margin: 0, color: '#2c3e50', fontSize: '1.3rem' }}>
                           👤 {agent.name}
                         </h3>
-                        <button
-                          onClick={() => deleteAgent(agent.id, agent.name)}
-                          style={{
-                            background: '#ff4757',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold'
-                          }}
-                          title="에이전트 삭제"
-                        >
-                          🗑️ 삭제
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => openEditForm(agent)}
+                            style={{
+                              background: '#6c5ce7',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold'
+                            }}
+                            title="에이전트 수정"
+                          >
+                            ✏️ 수정
+                          </button>
+                          <button
+                            onClick={() => deleteAgent(agent.id, agent.name)}
+                            style={{
+                              background: '#ff4757',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '6px 12px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold'
+                            }}
+                            title="에이전트 삭제"
+                          >
+                            🗑️ 삭제
+                          </button>
+                        </div>
                       </div>
                       
                       <div style={{ color: '#666', fontSize: '0.95rem', lineHeight: '1.5' }}>
@@ -532,16 +703,73 @@ export default function AgentManagement() {
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div style={{ minWidth: '600px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8f9fa' }}>
+                        <th style={listHeaderStyle}>에이전트</th>
+                        <th style={listHeaderStyle}>연락처</th>
+                        <th style={listHeaderStyle}>계좌번호</th>
+                        <th style={listHeaderStyle}>접속수</th>
+                        <th style={listHeaderStyle}>견적요청</th>
+                        <th style={listHeaderStyle}>액션</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAgents.map((agent, index) => (
+                        <tr key={agent.id} style={{
+                          borderBottom: '1px solid #e9ecef',
+                          background: index % 2 === 0 ? 'white' : '#fcfcff'
+                        }}>
+                          <td style={listCellStyle}>
+                            <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>{agent.name}</div>
+                            <div style={{ color: '#6c757d', fontSize: '0.85rem' }}>{agent.id}</div>
+                            {agent.memo && (
+                              <div style={{ color: '#999', fontSize: '0.8rem', marginTop: '4px' }}>{agent.memo}</div>
+                            )}
+                          </td>
+                          <td style={listCellStyle}>
+                            <div>📞 {agent.phone}</div>
+                            {agent.email && <div>📧 {agent.email}</div>}
+                          </td>
+                          <td style={listCellStyle}>{agent.account_number || '계좌번호 미등록'}</td>
+                          <td style={{ ...listCellStyle, textAlign: 'center', fontWeight: 'bold' }}>{agent.clicks || 0}</td>
+                          <td style={{ ...listCellStyle, textAlign: 'center', fontWeight: 'bold' }}>{agent.quotes || 0}</td>
+                          <td style={{ ...listCellStyle, minWidth: '160px' }}>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                              <button
+                                onClick={() => openEditForm(agent)}
+                                style={listActionButtonStyle('#6c5ce7')}
+                              >
+                                ✏️ 수정
+                              </button>
+                              <button
+                                onClick={() => deleteAgent(agent.id, agent.name)}
+                                style={listActionButtonStyle('#ff4757')}
+                              >
+                                🗑️ 삭제
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* 에이전트 생성 모달 */}
       {showCreateForm && (
-        <div style={{
+        <div
+          onClick={closeFormModal}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -553,7 +781,9 @@ export default function AgentManagement() {
           justifyContent: 'center',
           zIndex: 1000
         }}>
-          <div style={{
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
             background: 'white',
             borderRadius: '16px',
             padding: '40px',
@@ -563,10 +793,10 @@ export default function AgentManagement() {
             overflow: 'auto'
           }}>
             <h2 style={{ marginBottom: '30px', textAlign: 'center', color: '#2c3e50' }}>
-              ➕ 새 에이전트 추가
+              {isEditing ? '✏️ 에이전트 정보 수정' : '➕ 새 에이전트 추가'}
             </h2>
             
-            <form onSubmit={createAgent}>
+            <form onSubmit={handleAgentSave}>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#2c3e50' }}>
                   이름 *
@@ -685,7 +915,7 @@ export default function AgentManagement() {
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowCreateForm(false)}
+                  onClick={closeFormModal}
                   style={{
                     flex: 1,
                     padding: '12px',
@@ -702,20 +932,20 @@ export default function AgentManagement() {
                 </button>
                 <button
                   type="submit"
-                  disabled={creating}
+                  disabled={saving}
                   style={{
                     flex: 1,
                     padding: '12px',
-                    background: creating ? '#ccc' : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                    background: saving ? '#ccc' : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '16px',
                     fontWeight: '600',
-                    cursor: creating ? 'not-allowed' : 'pointer'
+                    cursor: saving ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {creating ? '생성 중...' : '생성하기'}
+                  {saving ? '저장 중...' : isEditing ? '정보 수정' : '생성하기'}
                 </button>
               </div>
             </form>
