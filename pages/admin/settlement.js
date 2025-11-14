@@ -186,23 +186,32 @@ export default function SettlementPage() {
     }
   }
 
+  // 단가 조정 (해당 에이전트의 모든 견적요청의 commission_amount를 일괄 업데이트)
   const handleUnitPriceChange = async (agentId) => {
     const agent = settlementData.find(a => a.agentId === agentId)
-    const newPrice = prompt(`${agent.name}의 단가를 입력하세요 (현재: ₩${agent.unitPrice.toLocaleString()})`, agent.unitPrice)
+    if (!agent) return
+    
+    const currentAvgPrice = agent.quotes > 0 ? Math.round(agent.commission / agent.quotes) : 10000
+    const newPrice = prompt(`${agent.name}의 단가를 입력하세요 (현재 평균: ₩${currentAvgPrice.toLocaleString()})`, currentAvgPrice)
     
     if (newPrice && !isNaN(newPrice) && parseInt(newPrice) > 0) {
       try {
         const updatedPrice = parseInt(newPrice)
         
-        // 실제 API 호출 (에이전트 단가 업데이트)
-        const response = await fetch('/api/agents/update', {
+        // 해당 에이전트의 해당 월 모든 미정산 견적요청의 commission_amount 업데이트
+        const [year, monthNum] = viewingMonth.split('-').map(Number)
+        const startDate = `${viewingMonth}-01 00:00:00`
+        const endDate = new Date(year, monthNum, 0).toISOString().split('T')[0] + ' 23:59:59'
+        
+        const response = await fetch('/api/settlement/update-commission', {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             agentId,
-            commission_per_quote: updatedPrice
+            month: viewingMonth,
+            commissionAmount: updatedPrice
           }),
         })
 
@@ -598,14 +607,14 @@ export default function SettlementPage() {
                         <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '1rem' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                             <span style={{
-                              background: agent.unitPrice === 10000 ? '#6c757d' : 
-                                         agent.unitPrice > 10000 ? '#28a745' : '#fd7e14',
+                              background: ((agent.commission / agent.quotes) || 10000) === 10000 ? '#6c757d' : 
+                                         ((agent.commission / agent.quotes) || 10000) > 10000 ? '#28a745' : '#fd7e14',
                               color: 'white',
                               padding: '4px 8px',
                               borderRadius: '12px',
                               fontSize: '0.85rem'
                             }}>
-                              ₩{agent.unitPrice.toLocaleString()}
+                              ₩{((agent.commission / agent.quotes) || 10000).toLocaleString()}
                             </span>
                             {!agent.isSettled && (
                               <button

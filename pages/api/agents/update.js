@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { agentId, commission_per_quote, commission_rate } = req.body
+    const { agentId } = req.body
 
     if (!agentId) {
       return res.status(400).json({ error: 'Agent ID is required' })
@@ -23,17 +23,9 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Agent not found' })
     }
 
-    // 업데이트할 필드 구성
+    // 업데이트할 필드 구성 (커미션 관련 필드 제거)
     const updateData = {
       updated_at: new Date().toISOString()
-    }
-
-    if (commission_per_quote !== undefined) {
-      updateData.commission_per_quote = commission_per_quote
-    }
-
-    if (commission_rate !== undefined) {
-      updateData.commission_rate = commission_rate
     }
 
     // 에이전트 정보 업데이트

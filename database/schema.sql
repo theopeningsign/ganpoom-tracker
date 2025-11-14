@@ -8,7 +8,6 @@ CREATE TABLE agents (
     memo TEXT, -- 메모 (네이버블로그용, 인스타용 등)
     email VARCHAR(255), -- 이메일 (선택사항)
     phone VARCHAR(20), -- 전화번호 (선택사항)
-    commission_per_quote INTEGER DEFAULT 10000, -- 견적요청당 커미션 (원)
     is_active BOOLEAN DEFAULT true, -- 활성 상태
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

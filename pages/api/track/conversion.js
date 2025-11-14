@@ -19,7 +19,6 @@ export default async function handler(req, res) {
       agentId,
       sessionId,
       formData,
-      estimatedValue,
       conversionType = 'quote_request'
     } = req.body
 
@@ -31,7 +30,7 @@ export default async function handler(req, res) {
     // 에이전트 정보 조회
     const { data: agent, error: agentError } = await supabaseAdmin
       .from('agents')
-      .select('id, commission_rate, is_active')
+      .select('id, is_active')
       .eq('id', agentId)
       .eq('is_active', true)
       .single()
@@ -53,10 +52,6 @@ export default async function handler(req, res) {
     // 클라이언트 정보 수집
     const ipAddress = getClientIP(req)
     const userAgent = req.headers['user-agent'] || ''
-
-    // 예상 계약 금액 및 커미션 계산
-    const contractValue = estimatedValue || 0
-    const commissionAmount = contractValue * (agent.commission_rate / 100)
 
     // ganpoom.com 견적요청 기록
     const { data: quoteData, error: quoteError } = await supabaseAdmin
@@ -97,8 +92,8 @@ export default async function handler(req, res) {
           ip_address: ipAddress,
           user_agent: userAgent,
           session_id: sessionId,
-          estimated_value: contractValue,
-          commission_amount: commissionAmount,
+          estimated_value: null, // 예상 금액 계산 안 함 (단순히 견적요청만 추적)
+          commission_amount: null, // 커미션은 정산 시 수동으로 처리
           status: 'pending'
         }
       ])
@@ -138,8 +133,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
-      quoteId: quoteData.id,
-      commissionAmount: commissionAmount
+      quoteId: quoteData.id
     })
 
   } catch (error) {

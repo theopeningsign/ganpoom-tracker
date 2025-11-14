@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     // 활성 에이전트 목록 조회
     const { data: agents } = await supabaseAdmin
       .from('agents')
-      .select('id, name, phone, account_number, commission_rate, commission_per_quote')
+      .select('id, name, phone, account_number')
       .eq('is_active', true)
 
     // 각 에이전트별 해당 월 정산 데이터 계산
@@ -49,16 +49,16 @@ export default async function handler(req, res) {
         const settledCount = settledQuotes?.length || 0
         const isSettled = quoteCount > 0 && settledCount === quoteCount
 
-        // 커미션 계산
-        const unitPrice = agent.commission_per_quote || agent.commission_rate || 10000
+        // 커미션 계산 (commission_amount가 null이면 기본값 10,000원 사용)
+        const DEFAULT_COMMISSION = 10000
         const totalCommission = quotes?.reduce((sum, item) => 
-          sum + (item.commission_amount || unitPrice), 0
+          sum + (item.commission_amount || DEFAULT_COMMISSION), 0
         ) || 0
 
         // 이미 정산 완료된 금액
         const settledCommission = quotes?.filter(q => {
           return settledQuotes?.some(s => s.id === q.id)
-        }).reduce((sum, item) => sum + (item.commission_amount || unitPrice), 0) || 0
+        }).reduce((sum, item) => sum + (item.commission_amount || DEFAULT_COMMISSION), 0) || 0
 
         return {
           agentId: agent.id,
@@ -66,7 +66,6 @@ export default async function handler(req, res) {
           phone: agent.phone || '정보 없음',
           account: agent.account_number || '정보 없음',
           quotes: quoteCount,
-          unitPrice: unitPrice,
           commission: totalCommission,
           settledCommission: settledCommission,
           settlementMonth: month,

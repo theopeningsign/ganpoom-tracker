@@ -77,20 +77,33 @@ export default async function handler(req, res) {
     // 고유 ID 생성
     const agentId = await generateUniqueId()
 
+    // 에이전트 생성 데이터 준비
+    const insertData = {
+      id: agentId,
+      name: name.trim(),
+      memo: memo?.trim() || null,
+      email: email?.trim() || null, // 이메일은 선택사항
+      phone: phone?.trim() || null,
+      is_active: true
+    }
+    
+    // account_number가 있으면 추가 (컬럼이 없을 수 있으므로)
+    const accountNum = (account || account_number)?.trim()
+    if (accountNum) {
+      insertData.account_number = accountNum
+    }
+    
+    console.log('에이전트 생성 시도:', {
+      agentId,
+      name: insertData.name,
+      phone: insertData.phone,
+      account_number: insertData.account_number
+    })
+
     // 에이전트 생성
     const { data, error } = await supabaseAdmin
       .from('agents')
-      .insert([
-        {
-          id: agentId,
-          name: name.trim(),
-          memo: memo?.trim() || null,
-          email: email?.trim() || null, // 이메일은 선택사항
-          phone: phone?.trim() || null,
-          account_number: (account || account_number)?.trim() || null, // account 또는 account_number 모두 지원
-          is_active: true
-        }
-      ])
+      .insert([insertData])
       .select()
       .single()
 

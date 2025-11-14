@@ -222,46 +222,12 @@
         trackQuoteRequest: function(formData = {}) {
             debugLog('견적요청 추적 시작:', formData);
             
+            // 단순히 견적요청만 추적 (예상 금액 계산 제거)
             this.trackEvent('conversion', {
                 conversionType: 'quote_request',
-                formData: formData,
-                estimatedValue: this.estimateValue(formData)
+                formData: formData
+                // estimatedValue 제거 - 단순히 견적요청 건수만 추적
             });
-        },
-        
-        // 예상 계약 금액 추정 (ganpoom.com 실제 데이터 기반)
-        estimateValue: function(formData) {
-            // ganpoom.com 실제 서비스별 예상 금액
-            const serviceValues = {
-                '웹드문제작': 8000000,     // 웹드문 제작: 800만원
-                '간판제작': 3000000,       // 간판 제작: 300만원
-                '인테리어': 15000000,      // 인테리어: 1500만원
-                '외관공사': 20000000,      // 외관공사: 2000만원
-                '리모델링': 25000000,      // 리모델링: 2500만원
-                '신축': 100000000,         // 신축: 1억원
-                '수리': 2000000,          // 수리: 200만원
-                '유지보수': 1000000       // 유지보수: 100만원
-            };
-            
-            // ganpoom.com 폼 필드에서 서비스 타입 추출
-            const serviceType = formData.svc_type || formData.service_type || formData.service || '웹드문제작';
-            let baseValue = serviceValues[serviceType] || 5000000;
-            
-            // 요청 타입에 따른 가격 조정
-            const reqType = formData.req_type || formData.request_type || '';
-            if (reqType.includes('간단')) {
-                baseValue *= 0.7; // 간단한 작업은 30% 할인
-            } else if (reqType.includes('고급') || reqType.includes('프리미엄')) {
-                baseValue *= 1.5; // 고급 작업은 50% 추가
-            }
-            
-            // 층수에 따른 가격 조정 (간판/인테리어의 경우)
-            const floor = parseInt(formData.floor) || 1;
-            if (serviceType.includes('간판') || serviceType.includes('인테리어')) {
-                baseValue += (floor - 1) * 500000; // 층당 50만원 추가
-            }
-            
-            return Math.round(baseValue);
         },
         
         // 이벤트 리스너 설정
