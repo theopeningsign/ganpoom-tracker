@@ -8,7 +8,7 @@ export default function AgentManagement() {
   const [creating, setCreating] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortBy, setSortBy] = useState('name')
+  const [sortBy, setSortBy] = useState('created_at')
   const [viewMode, setViewMode] = useState('grid')
   const [formData, setFormData] = useState({
     name: '',
@@ -48,10 +48,13 @@ export default function AgentManagement() {
       switch (sortBy) {
         case 'name':
           return a.name.localeCompare(b.name)
-        case 'revenue':
-          return (b.revenue || 0) - (a.revenue || 0)
         case 'quotes':
           return (b.quotes || 0) - (a.quotes || 0)
+        case 'created_at':
+          // 가입날짜순 (가장 최근 가입자가 처음)
+          const dateA = new Date(a.created_at || 0).getTime()
+          const dateB = new Date(b.created_at || 0).getTime()
+          return dateB - dateA
         default:
           return 0
       }
@@ -364,8 +367,8 @@ export default function AgentManagement() {
                   cursor: 'pointer'
                 }}
               >
+                <option value="created_at">가입날짜순</option>
                 <option value="name">이름순</option>
-                <option value="revenue">매출순</option>
                 <option value="quotes">견적요청순</option>
               </select>
 
