@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       })
     }
 
-    // 일별 통계 (최근 30일)
+    // 일별 통계 (최근 30일) - 클릭 수 포함
     const dailyStats = []
     
     for (let i = 29; i >= 0; i--) {
@@ -104,12 +104,21 @@ export default async function handler(req, res) {
       const dayStart = dayDate.toISOString().split('T')[0] + ' 00:00:00'
       const dayEnd = dayDate.toISOString().split('T')[0] + ' 23:59:59'
       
+      // 일별 클릭 수
+      const { count: dailyClicks } = await supabaseAdmin
+        .from('link_clicks')
+        .select('*', { count: 'exact' })
+        .gte('clicked_at', dayStart)
+        .lte('clicked_at', dayEnd)
+      
+      // 일별 견적요청 수
       const { data: dailyQuotes } = await supabaseAdmin
         .from('quote_requests')
         .select('commission_amount')
         .gte('created_at', dayStart)
         .lte('created_at', dayEnd)
       
+      const clicks = dailyClicks || 0
       const quotes = dailyQuotes?.length || 0
       const commission = dailyQuotes?.reduce((sum, item) => 
         sum + (item.commission_amount || 10000), 0
@@ -117,6 +126,7 @@ export default async function handler(req, res) {
 
       dailyStats.push({
         date: dayDate.toISOString().split('T')[0],
+        clicks,
         quotes,
         commission
       })

@@ -69,13 +69,25 @@ export default function AgentManagement() {
       
       if (response.ok) {
         const result = await response.json()
-        setAgents(result.agents || [])
+        if (result.success && result.agents) {
+          setAgents(result.agents || [])
+        } else {
+          throw new Error(result.error || '알 수 없는 오류가 발생했습니다.')
+        }
       } else {
-        throw new Error(`API 호출 실패: ${response.status}`)
+        // 에러 응답의 상세 정보 확인
+        const errorData = await response.json().catch(() => ({}))
+        console.error('API 응답 오류:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        })
+        throw new Error(errorData.error || errorData.details || `API 호출 실패 (${response.status})`)
       }
     } catch (error) {
       console.error('에이전트 목록 로드 실패:', error)
-      showMessage('error', '에이전트 목록을 불러오는데 실패했습니다.')
+      const errorMessage = error.message || '에이전트 목록을 불러오는데 실패했습니다.'
+      showMessage('error', errorMessage)
       setAgents([]) // 실패시 빈 배열로 설정
     } finally {
       setLoading(false)
