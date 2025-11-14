@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
 
@@ -50,16 +50,80 @@ export default function AnalyticsPage() {
   })
   
   const [loading, setLoading] = useState(false)
+  const [loadingMonthlyDaily, setLoadingMonthlyDaily] = useState(false)
   const [agentSearchTerm, setAgentSearchTerm] = useState('')
   const [filteredAgentStats, setFilteredAgentStats] = useState([])
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [showAgentModal, setShowAgentModal] = useState(false)
   const [loadingAgentMonthly, setLoadingAgentMonthly] = useState(false)
   const monthlyTableRef = useRef(null)
+  const monthlySectionRef = useRef(null)
 
   useEffect(() => {
     loadAnalytics()
   }, [dateRange])
+
+  // 월별/일별 통계 로드
+  const loadMonthlyDailyStats = useCallback(async () => {
+    // 이미 로드 중이거나 데이터가 있으면 스킵
+    if (loadingMonthlyDaily || analytics.monthlyStats.length > 0) {
+      return
+    }
+
+    setLoadingMonthlyDaily(true)
+    try {
+      const response = await fetch('/api/stats/monthly-daily')
+      
+      if (response.ok) {
+        const result = await response.json()
+        
+        if (result.success) {
+          setAnalytics((prev) => ({
+            ...prev,
+            monthlyStats: result.monthlyStats || [],
+            dailyStats: result.dailyStats || []
+          }))
+        }
+      }
+    } catch (error) {
+      console.error('월별/일별 통계 로드 오류:', error)
+    } finally {
+      setLoadingMonthlyDaily(false)
+    }
+  }, [loadingMonthlyDaily, analytics.monthlyStats.length])
+
+  // 월별 통계 섹션이 화면에 보일 때 로드
+  useEffect(() => {
+    // ref가 아직 설정되지 않았으면 스킵
+    if (!monthlySectionRef.current) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && analytics.monthlyStats.length === 0 && !loadingMonthlyDaily) {
+            loadMonthlyDailyStats()
+          }
+        })
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentRef = monthlySectionRef.current
+    observer.observe(currentRef)
+
+    // 초기 화면에 이미 보이는 경우도 체크
+    if (currentRef.getBoundingClientRect().top < window.innerHeight) {
+      loadMonthlyDailyStats()
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef)
+      }
+    }
+  }, [analytics.monthlyStats.length, loadingMonthlyDaily, loadMonthlyDailyStats])
 
   // 월별 실적 테이블 최근 달로 스크롤
   useEffect(() => {
@@ -595,15 +659,22 @@ export default function AnalyticsPage() {
 
 
         {/* 간단한 통계 요약 */}
-        {analytics.monthlyStats.length > 0 && (
-          <div style={{
+        <div 
+          ref={monthlySectionRef}
+          style={{
             background: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(10px)',
             borderRadius: '16px',
             padding: '30px',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
           }}>
-            <h3 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>📅 월별 실적 추이</h3>
+          {loadingMonthlyDaily ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+              월별 통계 로딩 중...
+            </div>
+          ) : analytics.monthlyStats.length > 0 ? (
+            <>
+              <h3 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>📅 월별 실적 추이</h3>
             
             <div style={{ 
               overflowX: 'auto',
@@ -657,8 +728,9 @@ export default function AnalyticsPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+            </>
+          ) : null}
+        </div>
 
       </div>
 

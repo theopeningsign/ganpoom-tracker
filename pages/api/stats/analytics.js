@@ -34,13 +34,24 @@ export default async function handler(req, res) {
       .eq('is_active', true)
 
     // 각 에이전트별 기간별 통계 계산 (병렬 최적화)
-    const startDateTime = `${defaultStart} 00:00:00`
-    const endDateTime = `${defaultEnd} 23:59:59`
+    // 날짜 문자열을 ISO 8601 형식으로 변환 (한국 시간대 KST = UTC+9)
+    // 시작일: 00:00:00 KST → UTC로 변환
+    const startDateObj = new Date(`${defaultStart}T00:00:00+09:00`)
+    // 종료일: 23:59:59.999 KST → UTC로 변환
+    const endDateObj = new Date(`${defaultEnd}T23:59:59.999+09:00`)
+    
+    // ISO 8601 형식으로 변환 (Supabase TIMESTAMP WITH TIME ZONE과 정확히 비교)
+    const startDateTime = startDateObj.toISOString()
+    const endDateTime = endDateObj.toISOString()
+    
+    // 디버깅용 로그 (배포 후 제거 가능)
+    // console.log('기간 필터:', { defaultStart, defaultEnd, startDateTime, endDateTime })
 
     const agentStats = await Promise.all(
       (agents || []).map(async (agent) => {
         try {
           // 병렬로 클릭 수와 견적요청 조회
+          // 기간 필터: startDateTime <= clicked_at/created_at <= endDateTime
           const [clickResult, quoteResult] = await Promise.all([
             supabaseAdmin
               .from('link_clicks')
@@ -105,128 +116,12 @@ export default async function handler(req, res) {
       })
     )
 
-    // 월별 전체 통계 (최근 12개월) - 병렬 최적화
-    const now = new Date()
-    const monthlyQueries = []
-    const monthlyDates = []
-    
-    for (let i = 11; i >= 0; i--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-      
-      monthlyDates.push({
-        month: `${monthDate.getFullYear()}.${(monthDate.getMonth() + 1).toString().padStart(2, '0')}`,
-        start: monthDate.toISOString(),
-        end: nextMonth.toISOString()
-      })
-      
-      // 월별 클릭 수와 견적요청 수를 병렬로 조회
-      monthlyQueries.push(
-        Promise.all([
-          supabaseAdmin
-            .from('link_clicks')
-            .select('*', { count: 'exact' })
-            .gte('clicked_at', monthDate.toISOString())
-            .lt('clicked_at', nextMonth.toISOString()),
-          supabaseAdmin
-            .from('quote_requests')
-            .select('*', { count: 'exact' })
-            .gte('created_at', monthDate.toISOString())
-            .lt('created_at', nextMonth.toISOString())
-        ])
-      )
-    }
-
-    // 모든 월별 쿼리를 병렬로 실행 (에러 발생 시 기본값 사용)
-    const monthlyResults = await Promise.allSettled(monthlyQueries)
-    const monthlyStats = monthlyResults.map((result, index) => {
-      if (result.status === 'fulfilled' && result.value && result.value[0] && result.value[1]) {
-        const clicks = result.value[0].count || 0
-        const quotes = result.value[1].count || 0
-        
-        return {
-          month: monthlyDates[index].month,
-          clicks,
-          quotes
-        }
-      } else {
-        // 에러 발생 시 기본값
-        console.error(`월별 통계 조회 오류 (${monthlyDates[index].month}):`, result.reason)
-        return {
-          month: monthlyDates[index].month,
-          clicks: 0,
-          quotes: 0
-        }
-      }
-    })
-
-    // 일별 통계 (최근 30일) - 병렬 최적화
-    const dailyQueries = []
-    const dailyDates = []
-    
-    for (let i = 29; i >= 0; i--) {
-      const dayDate = new Date()
-      dayDate.setDate(dayDate.getDate() - i)
-      
-      const dayStart = dayDate.toISOString().split('T')[0] + ' 00:00:00'
-      const dayEnd = dayDate.toISOString().split('T')[0] + ' 23:59:59'
-      
-      dailyDates.push({
-        date: dayDate.toISOString().split('T')[0],
-        start: dayStart,
-        end: dayEnd
-      })
-      
-      // 클릭 수와 견적요청을 병렬로 조회
-      dailyQueries.push(
-        Promise.all([
-          supabaseAdmin
-            .from('link_clicks')
-            .select('*', { count: 'exact' })
-            .gte('clicked_at', dayStart)
-            .lte('clicked_at', dayEnd),
-          supabaseAdmin
-            .from('quote_requests')
-            .select('commission_amount')
-            .gte('created_at', dayStart)
-            .lte('created_at', dayEnd)
-        ])
-      )
-    }
-
-    // 모든 일별 쿼리를 병렬로 실행 (에러 발생 시 기본값 사용)
-    const dailyResults = await Promise.allSettled(dailyQueries)
-    const dailyStats = dailyResults.map((result, index) => {
-      if (result.status === 'fulfilled' && result.value) {
-        const clicks = result.value[0]?.count || 0
-        const quotes = result.value[1]?.data?.length || 0
-        const commission = result.value[1]?.data?.reduce((sum, item) => 
-          sum + (item.commission_amount || 10000), 0
-        ) || 0
-
-        return {
-          date: dailyDates[index].date,
-          clicks,
-          quotes,
-          commission
-        }
-      } else {
-        // 에러 발생 시 기본값
-        console.error(`일별 통계 조회 오류 (${dailyDates[index].date}):`, result.reason)
-        return {
-          date: dailyDates[index].date,
-          clicks: 0,
-          quotes: 0,
-          commission: 0
-        }
-      }
-    })
-
     // 전체 통계 계산
     const totalQuotes = agentStats.reduce((sum, agent) => sum + agent.quotes, 0)
     const totalCommission = agentStats.reduce((sum, agent) => sum + agent.commission, 0)
     const totalRevenue = agentStats.reduce((sum, agent) => sum + agent.revenue, 0)
 
+    // 월별/일별 통계는 별도 API로 분리 (성능 최적화)
     res.status(200).json({
       success: true,
       dateRange: {
@@ -237,8 +132,8 @@ export default async function handler(req, res) {
       totalCommission,
       totalRevenue,
       agentStats: agentStats.sort((a, b) => b.quotes - a.quotes),
-      monthlyStats,
-      dailyStats
+      monthlyStats: [], // 별도 API로 로드
+      dailyStats: [] // 별도 API로 로드
     })
 
   } catch (error) {
