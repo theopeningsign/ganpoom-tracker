@@ -38,6 +38,13 @@ export default async function handler(req, res) {
     const startISO = todayStart.toISOString()
     const endISO = todayEnd.toISOString()
 
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+    const startISO = todayStart.toISOString()
+    const endISO = todayEnd.toISOString()
+
     const [recentQuotesResult, topAgentsResult, monthlyQueries, todayQuotesResult] = await Promise.all([
       // 최근 견적요청 목록 (최대 10개)
       supabaseAdmin
@@ -85,7 +92,7 @@ export default async function handler(req, res) {
         }
         
         return { queries, dates }
-      })()
+      })(),
       supabaseAdmin
         .from('quote_requests')
         .select('agent_id, agents!inner(name)')
