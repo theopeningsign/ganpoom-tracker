@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     const conversionRate = totalClicks > 0 ? ((totalQuotes / totalClicks) * 100).toFixed(1) : '0.0'
 
     // 최근 견적요청, 상위 에이전트, 월별 통계를 병렬로 조회
-    const [recentQuotesResult, agentsResult, monthlyQueries] = await Promise.all([
+    const [recentQuotesResult, topAgentsResult, monthlyQueries] = await Promise.all([
       // 최근 견적요청 목록 (최대 10개)
       supabaseAdmin
         .from('quote_requests')
@@ -107,7 +107,7 @@ export default async function handler(req, res) {
     })
 
     // 상위 에이전트 통계 계산 (병렬)
-    const agents = agentsResult.data || []
+    const agents = topAgentsResult.data || []
     const topAgents = await Promise.all(
       agents.map(async (agent) => {
         const [clickCount, quoteCount] = await Promise.all([
