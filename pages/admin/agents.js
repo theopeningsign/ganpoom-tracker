@@ -261,6 +261,18 @@ export default function AgentManagement() {
                   cursor: 'pointer'
                 }}>📊 상세 통계</button>
               </Link>
+              
+              <Link href="/admin/settlement" style={{ textDecoration: 'none' }}>
+                <button style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}>💰 정산관리</button>
+              </Link>
             </div>
           </div>
         </div>
@@ -438,7 +450,7 @@ export default function AgentManagement() {
                       
                       <div style={{ color: '#666', fontSize: '0.95rem', lineHeight: '1.5' }}>
                         <p style={{ margin: '5px 0' }}>📞 {agent.phone}</p>
-                        <p style={{ margin: '5px 0' }}>🏦 {agent.account || '계좌번호 미등록'}</p>
+                        <p style={{ margin: '5px 0' }}>🏦 {agent.account_number || '계좌번호 미등록'}</p>
                         <p style={{ margin: '5px 0' }}>🆔 {agent.id}</p>
                         {agent.memo && (
                           <p style={{ margin: '5px 0', fontStyle: 'italic' }}>💭 {agent.memo}</p>

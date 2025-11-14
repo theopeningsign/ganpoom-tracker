@@ -377,7 +377,19 @@ export default function AnalyticsPage() {
                   borderRadius: '8px',
                   fontWeight: 'bold',
                   cursor: 'pointer'
-                }}>에이전트 관리</button>
+                }}>👥 에이전트 관리</button>
+              </Link>
+              
+              <Link href="/admin/settlement" style={{ textDecoration: 'none' }}>
+                <button style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}>💰 정산관리</button>
               </Link>
             </div>
           </div>
