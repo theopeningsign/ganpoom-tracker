@@ -5,7 +5,7 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/tracker.js',
+        source: '/ganpoom-tracker.js',
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
@@ -18,6 +18,23 @@ const nextConfig = {
           {
             key: 'Access-Control-Allow-Headers',
             value: 'Content-Type',
+          },
+        ],
+      },
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization',
           },
         ],
       },

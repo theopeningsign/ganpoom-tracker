@@ -13,6 +13,7 @@ export default function AgentManagement() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    email: '',
     account: '',
     memo: ''
   })
@@ -101,16 +102,25 @@ export default function AgentManagement() {
       })
 
       if (response.ok) {
-        const newAgent = await response.json()
+        const result = await response.json()
+        
+        // 응답 데이터 구조 확인 (agent 객체 또는 전체 응답)
+        const newAgent = result.agent || result
         
         // 로컬 상태 업데이트
         setAgents(prev => [...prev, newAgent])
         
         // 폼 초기화
-        setFormData({ name: '', phone: '', account: '', memo: '' })
+        setFormData({ name: '', phone: '', email: '', account: '', memo: '' })
         setShowCreateForm(false)
         
-        showMessage('success', `✅ ${newAgent.name} 에이전트가 생성되었습니다! 추적 링크: ${newAgent.trackingLink}`)
+        // 추적 링크 생성 (응답에 없으면 직접 생성)
+        const trackingLink = result.trackingLink || `https://www.ganpoom.com/?ref=${newAgent.id}`
+        
+        showMessage('success', `✅ ${newAgent.name} 에이전트가 생성되었습니다! 추적 링크: ${trackingLink}`)
+        
+        // 에이전트 목록 새로고침
+        loadAgents()
       } else {
         throw new Error('에이전트 생성 실패')
       }
@@ -558,6 +568,28 @@ export default function AgentManagement() {
                     outline: 'none'
                   }}
                   placeholder="예: 010-1234-5678"
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#2c3e50' }}>
+                  이메일 (선택사항)
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
+                    padding: '12px 16px',
+                    border: '2px solid #e1e5e9',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    outline: 'none'
+                  }}
+                  placeholder="예: agent@example.com"
                 />
               </div>
 

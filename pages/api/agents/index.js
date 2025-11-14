@@ -6,6 +6,15 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 환경변수 확인
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase 환경변수가 설정되지 않았습니다.')
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        details: 'Supabase credentials not configured'
+      })
+    }
+
     // Supabase에서 활성 에이전트 목록 조회
     const { data: agents, error } = await supabaseAdmin
       .from('agents')
@@ -25,7 +34,11 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('에이전트 목록 조회 오류:', error)
-      return res.status(500).json({ error: 'Database query failed' })
+      console.error('에러 상세:', JSON.stringify(error, null, 2))
+      return res.status(500).json({ 
+        error: 'Database query failed',
+        details: error.message || 'Unknown error'
+      })
     }
 
     // 각 에이전트별 통계 정보 추가 (옵션)

@@ -9,31 +9,36 @@
     
     // 설정
     const CONFIG = {
-        // API 엔드포인트 자동 감지 (현재 도메인 기반)
-        // ganpoom.com에서 사용시: 현재 도메인의 /api 사용
-        // 로컬 개발시: http://localhost:3000/api 사용
+        // API 엔드포인트 자동 감지
+        // 스크립트 태그에서 data-api-endpoint 속성 확인 (우선순위 1)
+        // 스크립트 src에서 추출 (우선순위 2)
+        // 기본값: Vercel 배포 URL (우선순위 3)
         apiEndpoint: (function() {
-            // 스크립트 태그에서 data-api-endpoint 속성 확인
+            // 1. 스크립트 태그에서 data-api-endpoint 속성 확인
             const scriptTag = document.currentScript || document.querySelector('script[data-api-endpoint]');
             if (scriptTag && scriptTag.getAttribute('data-api-endpoint')) {
                 return scriptTag.getAttribute('data-api-endpoint');
             }
-            // 스크립트 src에서 추출
+            // 2. 스크립트 src에서 추출 (스크립트가 로드된 서버의 /api 사용)
             const scripts = document.getElementsByTagName('script');
             for (let i = 0; i < scripts.length; i++) {
                 const src = scripts[i].src;
                 if (src && src.includes('ganpoom-tracker.js')) {
-                    const url = new URL(src, window.location.href);
-                    return url.origin + '/api';
+                    try {
+                        const url = new URL(src);
+                        return url.origin + '/api';
+                    } catch (e) {
+                        // URL 파싱 실패시 계속 진행
+                    }
                 }
             }
-            // 기본값: 현재 도메인 기반
-            return (typeof window !== 'undefined' ? window.location.origin : '') + '/api';
+            // 3. 기본값: Vercel 배포 URL (ganpoom.com에서 사용시)
+            return 'https://ganpoom-tracker-htkz.vercel.app/api';
         })(),
         cookieName: 'ganpoom_agent_ref',
         cookieExpiry: 30, // 30일
         sessionCookieName: 'ganpoom_session',
-        debug: false // 운영 시 false로 변경
+        debug: true // 테스트용: true, 운영 시 false로 변경
     };
     
     // 디버그 로그 함수
