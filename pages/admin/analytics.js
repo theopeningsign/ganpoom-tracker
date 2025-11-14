@@ -22,9 +22,21 @@ export default function AnalyticsPage() {
   `
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date()
+    // 로컬 시간대 기준으로 날짜 계산 (UTC 변환 시 날짜 변경 방지)
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const date = today.getDate()
+    
+    // 이번 달 1일 (로컬 시간 기준)
+    const firstDay = new Date(year, month, 1)
+    const firstDayStr = `${firstDay.getFullYear()}-${(firstDay.getMonth() + 1).toString().padStart(2, '0')}-${firstDay.getDate().toString().padStart(2, '0')}`
+    
+    // 오늘 (로컬 시간 기준)
+    const todayStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${date.toString().padStart(2, '0')}`
+    
     return {
-      startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0], // 이번 달 1일
-      endDate: today.toISOString().split('T')[0] // 오늘
+      startDate: firstDayStr, // 이번 달 1일
+      endDate: todayStr // 오늘
     }
   })
   
@@ -42,6 +54,7 @@ export default function AnalyticsPage() {
   const [filteredAgentStats, setFilteredAgentStats] = useState([])
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [showAgentModal, setShowAgentModal] = useState(false)
+  const [loadingAgentMonthly, setLoadingAgentMonthly] = useState(false)
   const monthlyTableRef = useRef(null)
 
   useEffect(() => {
@@ -225,11 +238,35 @@ export default function AnalyticsPage() {
     })
   }
 
-  // 에이전트 클릭 핸들러
-  const handleAgentClick = (agent) => {
-    // API에서 가져온 실제 데이터 사용 (더미 데이터 생성하지 않음)
-    setSelectedAgent(agent)
+  // 에이전트 클릭 핸들러 - 모달 열 때 월별 통계 로드
+  const handleAgentClick = async (agent) => {
+    setSelectedAgent({ ...agent, monthlyStats: [] })
     setShowAgentModal(true)
+    setLoadingAgentMonthly(true)
+
+    try {
+      // 에이전트별 월별 통계 로드
+      const response = await fetch(`/api/stats/agent-monthly?agentId=${agent.agentId}`)
+      
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.monthlyStats) {
+          setSelectedAgent({
+            ...agent,
+            monthlyStats: result.monthlyStats
+          })
+        }
+      }
+    } catch (error) {
+      console.error('에이전트 월별 통계 로드 오류:', error)
+      // 에러 시 빈 배열로 설정
+      setSelectedAgent({
+        ...agent,
+        monthlyStats: []
+      })
+    } finally {
+      setLoadingAgentMonthly(false)
+    }
   }
 
   return (
@@ -581,15 +618,18 @@ export default function AnalyticsPage() {
                 <thead style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 1 }}>
                   <tr>
                     <th style={{ padding: '15px', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>월</th>
+                    <th style={{ padding: '15px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}>접속수</th>
                     <th style={{ padding: '15px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}>견적요청</th>
-                    <th style={{ padding: '15px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}>커미션</th>
                     <th style={{ padding: '15px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}>전월 대비</th>
                   </tr>
                 </thead>
                 <tbody>
                   {analytics.monthlyStats.map((month, index) => {
                     const prevMonth = analytics.monthlyStats[index - 1]
-                    const growth = prevMonth && prevMonth.quotes > 0 ? ((month.quotes - prevMonth.quotes) / prevMonth.quotes * 100).toFixed(1) : '0'
+                    // 전월대비는 견적요청 건수 기준으로 계산
+                    const growth = prevMonth && prevMonth.quotes > 0 ? 
+                      ((month.quotes - prevMonth.quotes) / prevMonth.quotes * 100).toFixed(1) : 
+                      (prevMonth && prevMonth.quotes === 0 && month.quotes > 0 ? '100.0' : '0.0')
                     
                     return (
                       <tr key={month.month} style={{ 
@@ -597,11 +637,11 @@ export default function AnalyticsPage() {
                         background: index % 2 === 0 ? 'white' : '#f8f9fa'
                       }}>
                         <td style={{ padding: '15px', fontWeight: 'bold' }}>{month.month}</td>
-                        <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                          {month.quotes}건
+                        <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#4facfe' }}>
+                          {month.clicks || 0}건
                         </td>
-                        <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', color: '#28a745' }}>
-                          ₩{month.commission.toLocaleString()}
+                        <td style={{ padding: '15px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                          {month.quotes || 0}건
                         </td>
                         <td style={{ padding: '15px', textAlign: 'center' }}>
                           <span style={{ 
@@ -738,7 +778,17 @@ export default function AnalyticsPage() {
             </div>
 
             {/* 최근 6개월 실적 */}
-            {selectedAgent.monthlyStats && selectedAgent.monthlyStats.length > 0 && (
+            {loadingAgentMonthly ? (
+              <div style={{
+                background: '#fff',
+                border: '1px solid #e9ecef',
+                borderRadius: '12px',
+                padding: '40px',
+                textAlign: 'center'
+              }}>
+                <div style={{ color: '#666' }}>월별 통계 로딩 중...</div>
+              </div>
+            ) : selectedAgent.monthlyStats && selectedAgent.monthlyStats.length > 0 ? (
               <div style={{
                 background: '#fff',
                 border: '1px solid #e9ecef',
@@ -800,6 +850,17 @@ export default function AnalyticsPage() {
                 }}>
                   💡 파란색으로 표시된 월이 현재 월입니다
                 </div>
+              </div>
+            ) : (
+              <div style={{
+                background: '#fff',
+                border: '1px solid #e9ecef',
+                borderRadius: '12px',
+                padding: '20px',
+                textAlign: 'center',
+                color: '#666'
+              }}>
+                월별 통계 데이터가 없습니다.
               </div>
             )}
 

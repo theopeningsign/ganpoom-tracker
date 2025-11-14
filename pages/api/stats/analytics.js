@@ -8,10 +8,24 @@ export default async function handler(req, res) {
   try {
     const { startDate, endDate } = req.query
 
-    // 기본값 설정 (이번 달)
+    // 기본값 설정 (이번 달) - 로컬 시간대 기준
     const today = new Date()
-    const defaultStart = startDate || new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
-    const defaultEnd = endDate || today.toISOString().split('T')[0]
+    let defaultStart, defaultEnd
+    
+    if (startDate) {
+      defaultStart = startDate
+    } else {
+      // 이번 달 1일 (로컬 시간 기준)
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+      defaultStart = `${firstDay.getFullYear()}-${(firstDay.getMonth() + 1).toString().padStart(2, '0')}-${firstDay.getDate().toString().padStart(2, '0')}`
+    }
+    
+    if (endDate) {
+      defaultEnd = endDate
+    } else {
+      // 오늘 (로컬 시간 기준)
+      defaultEnd = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`
+    }
 
     // 활성 에이전트 목록 조회 (상세 정보 포함)
     const { data: agents } = await supabaseAdmin
@@ -55,38 +69,7 @@ export default async function handler(req, res) {
         const conversionRate = clickCount > 0 ? 
           ((quoteCount / clickCount) * 100).toFixed(1) : '0.0'
 
-        // 각 에이전트별 월별 견적요청 수 (최근 6개월) - 병렬로 조회
-        const now = new Date()
-        const monthlyQueries = []
-        const monthlyDates = []
-        
-        for (let i = 5; i >= 0; i--) {
-          const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-          const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-          
-          monthlyDates.push({
-            month: `${monthDate.getFullYear()}-${(monthDate.getMonth() + 1).toString().padStart(2, '0')}`,
-            start: monthDate.toISOString(),
-            end: nextMonth.toISOString()
-          })
-          
-          monthlyQueries.push(
-            supabaseAdmin
-              .from('quote_requests')
-              .select('*', { count: 'exact' })
-              .eq('agent_id', agent.id)
-              .gte('created_at', monthDate.toISOString())
-              .lt('created_at', nextMonth.toISOString())
-          )
-        }
-
-          // 모든 월별 쿼리를 병렬로 실행
-          const monthlyResults = await Promise.all(monthlyQueries)
-          const monthlyStats = monthlyResults.map((result, index) => ({
-            month: monthlyDates[index].month,
-            quotes: result.count || 0
-          }))
-
+          // 에이전트별 월별 통계는 모달에서만 로드 (성능 최적화)
           return {
             agentId: agent.id,
             name: agent.name,
@@ -99,8 +82,7 @@ export default async function handler(req, res) {
             commission: totalCommission,
             revenue: totalRevenue,
             conversionRate: parseFloat(conversionRate),
-            period: `${defaultStart} ~ ${defaultEnd}`,
-            monthlyStats: monthlyStats
+            period: `${defaultStart} ~ ${defaultEnd}`
           }
         } catch (error) {
           // 개별 에이전트 조회 실패 시 기본값 반환
@@ -117,8 +99,7 @@ export default async function handler(req, res) {
             commission: 0,
             revenue: 0,
             conversionRate: 0,
-            period: `${defaultStart} ~ ${defaultEnd}`,
-            monthlyStats: []
+            period: `${defaultStart} ~ ${defaultEnd}`
           }
         }
       })
@@ -139,36 +120,42 @@ export default async function handler(req, res) {
         end: nextMonth.toISOString()
       })
       
+      // 월별 클릭 수와 견적요청 수를 병렬로 조회
       monthlyQueries.push(
-        supabaseAdmin
-          .from('quote_requests')
-          .select('commission_amount')
-          .gte('created_at', monthDate.toISOString())
-          .lt('created_at', nextMonth.toISOString())
+        Promise.all([
+          supabaseAdmin
+            .from('link_clicks')
+            .select('*', { count: 'exact' })
+            .gte('clicked_at', monthDate.toISOString())
+            .lt('clicked_at', nextMonth.toISOString()),
+          supabaseAdmin
+            .from('quote_requests')
+            .select('*', { count: 'exact' })
+            .gte('created_at', monthDate.toISOString())
+            .lt('created_at', nextMonth.toISOString())
+        ])
       )
     }
 
     // 모든 월별 쿼리를 병렬로 실행 (에러 발생 시 기본값 사용)
     const monthlyResults = await Promise.allSettled(monthlyQueries)
     const monthlyStats = monthlyResults.map((result, index) => {
-      if (result.status === 'fulfilled' && result.value.data) {
-        const quotes = result.value.data.length || 0
-        const commission = result.value.data.reduce((sum, item) => 
-          sum + (item.commission_amount || 10000), 0
-        ) || 0
+      if (result.status === 'fulfilled' && result.value && result.value[0] && result.value[1]) {
+        const clicks = result.value[0].count || 0
+        const quotes = result.value[1].count || 0
         
         return {
           month: monthlyDates[index].month,
-          quotes,
-          commission
+          clicks,
+          quotes
         }
       } else {
         // 에러 발생 시 기본값
         console.error(`월별 통계 조회 오류 (${monthlyDates[index].month}):`, result.reason)
         return {
           month: monthlyDates[index].month,
-          quotes: 0,
-          commission: 0
+          clicks: 0,
+          quotes: 0
         }
       }
     })
