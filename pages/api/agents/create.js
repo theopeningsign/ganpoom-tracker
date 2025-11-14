@@ -88,7 +88,6 @@ export default async function handler(req, res) {
           email: email?.trim() || null, // 이메일은 선택사항
           phone: phone?.trim() || null,
           account_number: (account || account_number)?.trim() || null, // account 또는 account_number 모두 지원
-          commission_rate: 10.0, // 기본값 10% (향후 필요시 폼에서 입력받을 수 있음)
           is_active: true
         }
       ])
@@ -97,10 +96,19 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('에이전트 생성 오류:', error)
+      console.error('에러 코드:', error.code)
+      console.error('에러 메시지:', error.message)
       console.error('에러 상세:', JSON.stringify(error, null, 2))
+      console.error('생성하려는 데이터:', {
+        id: agentId,
+        name: name.trim(),
+        phone: phone?.trim(),
+        account_number: (account || account_number)?.trim()
+      })
       return res.status(500).json({ 
         error: '에이전트 생성 실패',
-        details: error.message || 'Unknown error'
+        details: error.message || 'Unknown error',
+        code: error.code || 'UNKNOWN'
       })
     }
 

@@ -116,6 +116,10 @@ export default function AgentManagement() {
       if (response.ok) {
         const result = await response.json()
         
+        if (!result.success) {
+          throw new Error(result.error || '에이전트 생성 실패')
+        }
+        
         // 응답 데이터 구조 확인 (agent 객체 또는 전체 응답)
         const newAgent = result.agent || result
         
@@ -134,11 +138,19 @@ export default function AgentManagement() {
         // 에이전트 목록 새로고침
         loadAgents()
       } else {
-        throw new Error('에이전트 생성 실패')
+        // 에러 응답의 상세 정보 확인
+        const errorData = await response.json().catch(() => ({}))
+        console.error('API 응답 오류:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        })
+        throw new Error(errorData.error || errorData.details || `에이전트 생성 실패 (${response.status})`)
       }
     } catch (error) {
       console.error('에이전트 생성 실패:', error)
-      showMessage('error', '에이전트 생성에 실패했습니다.')
+      const errorMessage = error.message || '에이전트 생성에 실패했습니다.'
+      showMessage('error', errorMessage)
     } finally {
       setCreating(false)
     }
