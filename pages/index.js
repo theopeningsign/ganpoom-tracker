@@ -11,12 +11,11 @@ export default function HomePage() {
   })
   const [recentQuotes, setRecentQuotes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showAgentModal, setShowAgentModal] = useState(false)
-  const [selectedAgent, setSelectedAgent] = useState(null)
 
   useEffect(() => {
     loadRealTimeStats()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 빈 배열로 한 번만 실행
 
   const loadRealTimeStats = async () => {
     try {
@@ -54,10 +53,6 @@ export default function HomePage() {
     }
   }
 
-  // 에이전트 클릭 핸들러 (현재 비활성화 - 실제 에이전트 생성 후 활성화)
-  const handleAgentClick = (agentName) => {
-    console.log('에이전트 상세보기 기능은 실제 에이전트 생성 후 활성화됩니다:', agentName)
-  }
 
   return (
     <PasswordProtection>
@@ -490,177 +485,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 에이전트 상세 모달 (비활성화) */}
-      {showAgentModal && selectedAgent && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }} onClick={() => setShowAgentModal(false)}>
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '30px',
-            maxWidth: '600px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
-          }}
-          onClick={(e) => e.stopPropagation()}>
-            
-            {/* 모달 헤더 */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '25px',
-              paddingBottom: '15px',
-              borderBottom: '2px solid #f1f3f4'
-            }}>
-              <h2 style={{ margin: 0, color: '#2c3e50', fontSize: '1.5rem' }}>
-                👤 {selectedAgent.name} 상세 정보
-              </h2>
-              <button
-                onClick={() => setShowAgentModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: '#666',
-                  padding: '5px'
-                }}
-              >✕</button>
-            </div>
-
-            {/* 기본 정보 */}
-            <div style={{
-              background: '#f8f9fa',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '25px'
-            }}>
-              <h3 style={{ margin: '0 0 15px 0', color: '#495057' }}>📋 기본 정보</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                <div>
-                  <strong>에이전트 ID:</strong><br />
-                  <span style={{ color: '#666' }}>{selectedAgent.agentId}</span>
-                </div>
-                <div>
-                  <strong>이름:</strong><br />
-                  <span style={{ color: '#666' }}>{selectedAgent.name}</span>
-                </div>
-                <div>
-                  <strong>전화번호:</strong><br />
-                  <span style={{ color: '#666' }}>010-0000-0000</span>
-                </div>
-                <div>
-                  <strong>계좌번호:</strong><br />
-                  <span style={{ color: '#666' }}>국민은행 123-456-789012</span>
-                </div>
-              </div>
-              <div style={{ marginTop: '15px' }}>
-                <strong>메모:</strong><br />
-                <span style={{ color: '#666' }}>네이버 블로그 운영, 인스타그램 마케팅</span>
-              </div>
-            </div>
-
-            {/* 이번 달 성과 */}
-            <div style={{
-              background: '#e8f5e8',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '25px'
-            }}>
-              <h3 style={{ margin: '0 0 15px 0', color: '#2e7d32' }}>📊 이번 달 성과 ({new Date().toLocaleDateString('ko-KR', { month: 'long' })})</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px', textAlign: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#4facfe' }}>{selectedAgent.clicks}</div>
-                  <div style={{ fontSize: '0.9rem', color: '#666' }}>총 접속수</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#28a745' }}>{selectedAgent.quotes}건</div>
-                  <div style={{ fontSize: '0.9rem', color: '#666' }}>견적요청</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fd79a8' }}>
-                    {selectedAgent.clicks > 0 ? ((selectedAgent.quotes / selectedAgent.clicks) * 100).toFixed(1) : '0.0'}%
-                  </div>
-                  <div style={{ fontSize: '0.9rem', color: '#666' }}>전환율</div>
-                </div>
-              </div>
-            </div>
-
-            {/* 최근 6개월 실적 */}
-            <div style={{
-              background: '#fff3e0',
-              borderRadius: '12px',
-              padding: '20px'
-            }}>
-              <h3 style={{ margin: '0 0 15px 0', color: '#f57c00' }}>📈 최근 6개월 실적</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    {selectedAgent.monthlyStats.map((stat) => (
-                      <th key={stat.month} style={{ 
-                        padding: '10px', 
-                        textAlign: 'center', 
-                        borderBottom: '2px solid #ffcc02',
-                        fontSize: '0.9rem',
-                        color: '#e65100'
-                      }}>
-                        {stat.month.split('-')[1]}월
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {selectedAgent.monthlyStats.map((stat) => (
-                      <td key={stat.month} style={{ 
-                        padding: '10px', 
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                        fontSize: '1.1rem',
-                        color: stat.quotes > 0 ? '#2e7d32' : '#999'
-                      }}>
-                        {stat.quotes}건
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* 닫기 버튼 */}
-            <div style={{ textAlign: 'center', marginTop: '25px' }}>
-              <button
-                onClick={() => setShowAgentModal(false)}
-                style={{
-                  padding: '12px 30px',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         @media (max-width: 768px) {

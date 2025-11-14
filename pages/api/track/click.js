@@ -120,15 +120,43 @@ export default async function handler(req, res) {
         ])
     } else {
       // 기존 세션 업데이트 (페이지뷰 증가)
-      await supabaseAdmin
+      const { data: currentSession } = await supabaseAdmin
         .from('user_sessions')
-        .update({ 
-          page_views: supabaseAdmin.rpc('increment_page_views', { session_id: sessionId })
-        })
+        .select('page_views')
         .eq('id', sessionId)
+        .single()
+      
+      const newPageViews = (currentSession?.page_views || 0) + 1
+      
+      // 세션 업데이트와 페이지뷰 기록을 병렬로 실행
+      await Promise.all([
+        supabaseAdmin
+          .from('user_sessions')
+          .update({ 
+            page_views: newPageViews
+          })
+          .eq('id', sessionId),
+        supabaseAdmin
+          .from('page_views')
+          .insert([
+            {
+              session_id: sessionId,
+              agent_id: agentId,
+              page_url: landingPage || 'https://www.ganpoom.com',
+              page_title: 'Ganpoom - 홈페이지'
+            }
+          ])
+      ])
+
+      res.status(200).json({
+        success: true,
+        clickId: clickData.id,
+        sessionId: sessionId
+      })
+      return
     }
 
-    // 페이지뷰 기록
+    // 새 세션 생성 시 페이지뷰 기록 (병렬로 처리할 필요 없음 - 이미 세션 생성 중)
     await supabaseAdmin
       .from('page_views')
       .insert([

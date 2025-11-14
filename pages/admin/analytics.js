@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
 
@@ -42,10 +42,20 @@ export default function AnalyticsPage() {
   const [filteredAgentStats, setFilteredAgentStats] = useState([])
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [showAgentModal, setShowAgentModal] = useState(false)
+  const monthlyTableRef = useRef(null)
 
   useEffect(() => {
     loadAnalytics()
   }, [dateRange])
+
+  // 월별 실적 테이블 최근 달로 스크롤
+  useEffect(() => {
+    if (monthlyTableRef.current && analytics.monthlyStats.length > 0) {
+      setTimeout(() => {
+        monthlyTableRef.current.scrollTop = monthlyTableRef.current.scrollHeight
+      }, 100)
+    }
+  }, [analytics.monthlyStats])
 
   // 에이전트 검색 필터링
   useEffect(() => {
@@ -89,102 +99,20 @@ export default function AnalyticsPage() {
     } catch (error) {
       console.error('통계 로드 오류:', error)
       
-      // 실패시 fallback으로 Mock 데이터 사용
-      const mockData = generateAnalyticsData()
-      setAnalytics(mockData)
-      setFilteredAgentStats(mockData.agentStats)
+      // 실패시 빈 데이터로 설정
+      setAnalytics({
+        totalQuotes: 0,
+        totalCommission: 0,
+        agentStats: [],
+        dailyStats: [],
+        monthlyStats: []
+      })
+      setFilteredAgentStats([])
     } finally {
       setLoading(false)
     }
   }
 
-  // 20명 에이전트의 1월~11월 실제 데이터 생성
-  const generateRealisticAgentData = () => {
-    const agents = [
-      { agentId: 'Ab3kM9', name: '김철수' },
-      { agentId: 'Xy7nP2', name: '이영희' },
-      { agentId: 'Mn8kL4', name: '박민수' },
-      { agentId: 'Qw9rT5', name: '정미영' },
-      { agentId: 'Er6yU8', name: '최동훈' },
-      { agentId: 'Ty3iO1', name: '한지수' },
-      { agentId: 'Ui7pA4', name: '송민호' },
-      { agentId: 'Op2sD6', name: '윤서연' },
-      { agentId: 'As5dF7', name: '강혜진' },
-      { agentId: 'Gh8jK2', name: '조성민' },
-      { agentId: 'Lm4nB9', name: '신유리' },
-      { agentId: 'Cv6xZ3', name: '홍준석' },
-      { agentId: 'Bn7mQ1', name: '류소영' },
-      { agentId: 'Wq2eR8', name: '임태현' },
-      { agentId: 'Rt5yU4', name: '안미경' },
-      { agentId: 'Pl9oI6', name: '서준호' },
-      { agentId: 'Zx3cV0', name: '김나연' },
-      { agentId: 'Nm1bG5', name: '박상우' },
-      { agentId: 'Hj8kL7', name: '이수진' },
-      { agentId: 'Fd4sA2', name: '최민재' }
-    ]
-
-    return agents.map(agent => {
-      // 각 에이전트별로 1월~11월 월별 실적 생성
-      const monthlyData = {}
-      const monthlyClickData = {} // 🔥 월별 클릭 데이터 추가!
-      let totalQuotes = 0
-      let totalClicks = 0
-      
-      // 접속수 계산을 위한 전환율 설정 (견적요청의 3~10배 정도로 현실적 설정)
-      const clickMultiplier = agent.name === '류소영' ? 5 : // 전환율 좋음 (20%)
-                             agent.name === '김철수' ? 7 :  // 전환율 보통 (14%)
-                             agent.name === '임태현' ? 15 : // 전환율 낮음 (6.7%)
-                             8 // 평균 전환율 (12.5%)
-      
-      for (let month = 1; month <= 11; month++) {
-        // 월별로 0~30건 사이의 랜덤 견적요청 (현실적인 범위)
-        // 일부 에이전트는 실적이 좋고, 일부는 보통
-        const baseQuotes = agent.name === '류소영' ? 20 : // 최고 실적자
-                          agent.name === '김철수' ? 15 :
-                          agent.name === '이영희' ? 12 :
-                          agent.name === '임태현' ? 3 :  // 신입 에이전트
-                          8 // 평균
-        
-        // 에이전트ID와 월을 기반으로 고정된 값 생성 (매번 같은 결과)
-        const seed = agent.agentId.charCodeAt(0) + agent.agentId.charCodeAt(1) + month
-        const variation = (seed % 7) - 3 // -3 ~ +3 범위의 고정된 변동
-        const monthlyQuotes = Math.max(0, baseQuotes + variation)
-        
-        // 월별 클릭수 = 견적요청 * 전환율 배수
-        const monthlyClicks = Math.max(1, monthlyQuotes * clickMultiplier)
-        
-        monthlyData[`2025-${month.toString().padStart(2, '0')}`] = monthlyQuotes
-        monthlyClickData[`2025-${month.toString().padStart(2, '0')}`] = monthlyClicks // 🔥 월별 클릭 데이터 저장!
-        
-        totalQuotes += monthlyQuotes
-        totalClicks += monthlyClicks
-      }
-      
-      return {
-        agentId: agent.agentId,
-        name: agent.name,
-        quotes: monthlyData['2025-11'], // 11월 실적
-        clicks: monthlyClickData['2025-11'], // 🔥 11월 접속수 (월별 데이터에서 가져옴)
-        commission: monthlyData['2025-11'] * 10000,
-        period: '2025-11',
-        totalYearQuotes: totalQuotes,
-        totalYearClicks: totalClicks, // 🔥 연간 총 클릭수 추가
-        monthlyData: monthlyData, // 월별 견적요청 데이터
-        monthlyClickData: monthlyClickData // 🔥 월별 클릭 데이터 추가!
-      }
-    })
-  }
-
-  const generateAnalyticsData = () => {
-    // API 실패시 빈 데이터 반환 (더미 데이터 생성 안 함)
-    return {
-      totalQuotes: 0,
-      totalCommission: 0,
-      agentStats: [],
-      dailyStats: [],
-      monthlyStats: []
-    }
-  }
 
   // 엑셀 다운로드 함수
   const downloadExcel = () => {
@@ -299,29 +227,8 @@ export default function AnalyticsPage() {
 
   // 에이전트 클릭 핸들러
   const handleAgentClick = (agent) => {
-    // 에이전트 상세 정보 생성 (실제로는 API에서 가져올 데이터)
-    const agentDetails = {
-      ...agent,
-      email: `${agent.name.toLowerCase().replace(/\s+/g, '')}@example.com`,
-      phone: `010-${Math.floor(Math.random() * 9000) + 1000}-${Math.floor(Math.random() * 9000) + 1000}`,
-      memo: `${agent.name} 에이전트 - 네이버 블로그 활동`,
-      monthlyStats: agent.monthlyData ? 
-        // 실제 월별 데이터가 있으면 사용
-        Object.entries(agent.monthlyData)
-          .filter(([month]) => parseInt(month.split('-')[1]) >= 6) // 6월부터만
-          .map(([month, quotes]) => ({ month, quotes })) :
-        // 없으면 에이전트ID 기반 고정값 생성
-        [
-          { month: '2025-06', quotes: Math.max(1, (agent.agentId.charCodeAt(0) % 10) + 3) },
-          { month: '2025-07', quotes: Math.max(1, (agent.agentId.charCodeAt(1) % 12) + 2) },
-          { month: '2025-08', quotes: Math.max(1, (agent.agentId.charCodeAt(2) % 8) + 4) },
-          { month: '2025-09', quotes: Math.max(1, (agent.agentId.charCodeAt(0) % 15) + 1) },
-          { month: '2025-10', quotes: Math.max(1, (agent.agentId.charCodeAt(1) % 11) + 3) },
-          { month: '2025-11', quotes: agent.quotes }
-        ]
-    }
-    
-    setSelectedAgent(agentDetails)
+    // API에서 가져온 실제 데이터 사용 (더미 데이터 생성하지 않음)
+    setSelectedAgent(agent)
     setShowAgentModal(true)
   }
 
@@ -661,10 +568,18 @@ export default function AnalyticsPage() {
           }}>
             <h3 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>📅 월별 실적 추이</h3>
             
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ 
+              overflowX: 'auto',
+              maxHeight: '400px', // 4개 행 정도의 높이
+              overflowY: 'auto',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px'
+            }}
+            className="custom-scrollbar"
+            ref={monthlyTableRef}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8f9fa' }}>
+                <thead style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 1 }}>
+                  <tr>
                     <th style={{ padding: '15px', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>월</th>
                     <th style={{ padding: '15px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}>견적요청</th>
                     <th style={{ padding: '15px', textAlign: 'center', borderBottom: '2px solid #dee2e6' }}>커미션</th>
@@ -674,7 +589,7 @@ export default function AnalyticsPage() {
                 <tbody>
                   {analytics.monthlyStats.map((month, index) => {
                     const prevMonth = analytics.monthlyStats[index - 1]
-                    const growth = prevMonth ? ((month.quotes - prevMonth.quotes) / prevMonth.quotes * 100).toFixed(1) : 0
+                    const growth = prevMonth && prevMonth.quotes > 0 ? ((month.quotes - prevMonth.quotes) / prevMonth.quotes * 100).toFixed(1) : '0'
                     
                     return (
                       <tr key={month.month} style={{ 
@@ -690,10 +605,10 @@ export default function AnalyticsPage() {
                         </td>
                         <td style={{ padding: '15px', textAlign: 'center' }}>
                           <span style={{ 
-                            color: growth > 0 ? '#28a745' : growth < 0 ? '#dc3545' : '#666',
+                            color: parseFloat(growth) > 0 ? '#28a745' : parseFloat(growth) < 0 ? '#dc3545' : '#666',
                             fontWeight: 'bold'
                           }}>
-                            {growth > 0 ? '+' : ''}{growth}%
+                            {parseFloat(growth) > 0 ? '+' : ''}{growth}%
                           </span>
                         </td>
                       </tr>
@@ -778,16 +693,20 @@ export default function AnalyticsPage() {
                 </div>
                 <div>
                   <strong>전화번호:</strong><br />
-                  <span style={{ color: '#666' }}>{selectedAgent.phone || '010-0000-0000'}</span>
+                  <span style={{ color: '#666' }}>{selectedAgent.phone || '정보 없음'}</span>
                 </div>
                 <div>
                   <strong>계좌번호:</strong><br />
-                  <span style={{ color: '#666' }}>{selectedAgent.account || '국민은행 123-456-789012'}</span>
+                  <span style={{ color: '#666' }}>{selectedAgent.account_number || '정보 없음'}</span>
+                </div>
+                <div>
+                  <strong>이메일:</strong><br />
+                  <span style={{ color: '#666' }}>{selectedAgent.email || '정보 없음'}</span>
                 </div>
               </div>
               <div style={{ marginTop: '15px' }}>
                 <strong>메모:</strong><br />
-                <span style={{ color: '#666' }}>{selectedAgent.memo || '네이버 블로그 운영, 인스타그램 마케팅'}</span>
+                <span style={{ color: '#666' }}>{selectedAgent.memo || '정보 없음'}</span>
               </div>
             </div>
 
@@ -818,63 +737,71 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* 최근 5개월 실적 */}
-            <div style={{
-              background: '#fff',
-              border: '1px solid #e9ecef',
-              borderRadius: '12px',
-              padding: '20px'
-            }}>
-              <h3 style={{ margin: '0 0 20px 0', color: '#495057' }}>📈 최근 6개월 실적</h3>
-              
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {selectedAgent.monthlyStats.map((stat) => (
-                        <th key={stat.month} style={{
-                          padding: '12px 8px',
-                          textAlign: 'center',
-                          borderBottom: '2px solid #dee2e6',
-                          fontSize: '0.9rem',
-                          color: '#495057'
-                        }}>
-                          {stat.month.split('-')[1]}월
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {selectedAgent.monthlyStats.map((stat) => (
-                        <td key={stat.month} style={{
-                          padding: '15px 8px',
-                          textAlign: 'center',
-                          fontSize: '1.1rem',
-                          fontWeight: 'bold',
-                          color: stat.month === '2025-11' ? '#007bff' : '#495057',
-                          background: stat.month === '2025-11' ? '#e3f2fd' : 'transparent'
-                        }}>
-                          {stat.quotes}건
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              
-              <div style={{ 
-                marginTop: '15px', 
-                padding: '10px', 
-                background: '#f8f9fa', 
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                color: '#666',
-                textAlign: 'center'
+            {/* 최근 6개월 실적 */}
+            {selectedAgent.monthlyStats && selectedAgent.monthlyStats.length > 0 && (
+              <div style={{
+                background: '#fff',
+                border: '1px solid #e9ecef',
+                borderRadius: '12px',
+                padding: '20px'
               }}>
-                💡 파란색으로 표시된 11월이 현재 월입니다
+                <h3 style={{ margin: '0 0 20px 0', color: '#495057' }}>📈 최근 6개월 실적</h3>
+                
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {selectedAgent.monthlyStats.map((stat) => (
+                          <th key={stat.month} style={{
+                            padding: '12px 8px',
+                            textAlign: 'center',
+                            borderBottom: '2px solid #dee2e6',
+                            fontSize: '0.9rem',
+                            color: '#495057'
+                          }}>
+                            {parseInt(stat.month.split('-')[1])}월
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {selectedAgent.monthlyStats.map((stat) => {
+                          const currentMonth = new Date().getMonth() + 1
+                          const currentYear = new Date().getFullYear()
+                          const isCurrentMonth = stat.month === `${currentYear}-${currentMonth.toString().padStart(2, '0')}`
+                          
+                          return (
+                            <td key={stat.month} style={{
+                              padding: '15px 8px',
+                              textAlign: 'center',
+                              fontSize: '1.1rem',
+                              fontWeight: 'bold',
+                              color: isCurrentMonth ? '#007bff' : '#495057',
+                              background: isCurrentMonth ? '#e3f2fd' : 'transparent'
+                            }}>
+                              {stat.quotes}건
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div style={{ 
+                  marginTop: '15px', 
+                  padding: '10px', 
+                  background: '#f8f9fa', 
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  color: '#666',
+                  textAlign: 'center'
+                }}>
+                  💡 파란색으로 표시된 월이 현재 월입니다
+                </div>
               </div>
-            </div>
+            )}
 
             {/* 닫기 버튼 */}
             <div style={{ textAlign: 'center', marginTop: '25px' }}>

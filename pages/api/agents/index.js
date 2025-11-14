@@ -45,29 +45,29 @@ export default async function handler(req, res) {
       })
     }
 
-    // 각 에이전트별 통계 정보 추가 (옵션)
+    // 각 에이전트별 통계 정보 추가 (병렬 최적화)
     const agentsWithStats = await Promise.all(
       agents.map(async (agent) => {
-        // 링크 클릭 수 조회
-        const { count: clickCount } = await supabaseAdmin
-          .from('link_clicks')
-          .select('*', { count: 'exact' })
-          .eq('agent_id', agent.id)
+        // 모든 통계 쿼리를 병렬로 실행
+        const [clickResult, quoteResult, commissionResult] = await Promise.all([
+          supabaseAdmin
+            .from('link_clicks')
+            .select('*', { count: 'exact' })
+            .eq('agent_id', agent.id),
+          supabaseAdmin
+            .from('quote_requests')
+            .select('*', { count: 'exact' })
+            .eq('agent_id', agent.id),
+          supabaseAdmin
+            .from('quote_requests')
+            .select('commission_amount')
+            .eq('agent_id', agent.id)
+            .not('commission_amount', 'is', null)
+        ])
 
-        // 견적 요청 수 조회
-        const { count: quoteCount } = await supabaseAdmin
-          .from('quote_requests')
-          .select('*', { count: 'exact' })
-          .eq('agent_id', agent.id)
-
-        // 총 커미션 계산
-        const { data: commissionData } = await supabaseAdmin
-          .from('quote_requests')
-          .select('commission_amount')
-          .eq('agent_id', agent.id)
-          .not('commission_amount', 'is', null)
-
-        const totalCommission = commissionData?.reduce((sum, item) => 
+        const clickCount = clickResult.count || 0
+        const quoteCount = quoteResult.count || 0
+        const totalCommission = commissionResult.data?.reduce((sum, item) => 
           sum + (item.commission_amount || 0), 0
         ) || 0
 
@@ -80,8 +80,8 @@ export default async function handler(req, res) {
 
         return {
           ...agent,
-          clicks: clickCount || 0,
-          quotes: quoteCount || 0,
+          clicks: clickCount,
+          quotes: quoteCount,
           commission: totalCommission,
           conversionRate: conversionRate,
           trackingLink: trackingLink

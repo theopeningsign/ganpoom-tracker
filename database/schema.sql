@@ -8,6 +8,7 @@ CREATE TABLE agents (
     memo TEXT, -- 메모 (네이버블로그용, 인스타용 등)
     email VARCHAR(255), -- 이메일 (선택사항)
     phone VARCHAR(20), -- 전화번호 (선택사항)
+    account_number VARCHAR(100), -- 계좌번호
     is_active BOOLEAN DEFAULT true, -- 활성 상태
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -148,6 +149,13 @@ CREATE POLICY "Enable update for service role only" ON agents FOR UPDATE USING (
 
 CREATE POLICY "Enable read access for all users" ON link_clicks FOR SELECT USING (true);
 CREATE POLICY "Enable insert for service role only" ON link_clicks FOR INSERT WITH CHECK (auth.role() = 'service_role');
+
+CREATE POLICY "Enable read access for all users" ON user_sessions FOR SELECT USING (true);
+CREATE POLICY "Enable insert for service role only" ON user_sessions FOR INSERT WITH CHECK (auth.role() = 'service_role');
+CREATE POLICY "Enable update for service role only" ON user_sessions FOR UPDATE USING (auth.role() = 'service_role');
+
+CREATE POLICY "Enable read access for all users" ON page_views FOR SELECT USING (true);
+CREATE POLICY "Enable insert for service role only" ON page_views FOR INSERT WITH CHECK (auth.role() = 'service_role');
 
 CREATE POLICY "Enable read access for all users" ON quote_requests FOR SELECT USING (true);
 CREATE POLICY "Enable insert for service role only" ON quote_requests FOR INSERT WITH CHECK (auth.role() = 'service_role');
