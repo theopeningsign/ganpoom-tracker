@@ -7,6 +7,9 @@
 (function() {
     'use strict';
     
+    // 전체 스크립트를 try-catch로 감싸서 오류 발생 시에도 페이지가 멈추지 않도록
+    try {
+    
     // 설정
     const CONFIG = {
         // API 엔드포인트 자동 감지
@@ -38,7 +41,7 @@
         cookieName: 'ganpoom_agent_ref',
         cookieExpiry: 30, // 30일
         sessionCookieName: 'ganpoom_session',
-        debug: true // 테스트용: true, 운영 시 false로 변경
+        debug: false // 운영 시 false (콘솔 로그 최소화로 성능 향상)
     };
     
     // 디버그 로그 함수
@@ -128,18 +131,23 @@
         
         // 초기화
         init: function() {
-            if (this.isInitialized) return;
-            
-            debugLog('트래커 초기화 시작');
-            
-            this.sessionId = Utils.getCookie(CONFIG.sessionCookieName) || Utils.generateSessionId();
-            Utils.setCookie(CONFIG.sessionCookieName, this.sessionId, 1); // 1일 세션
-            
-            this.checkAgentLink();
-            this.setupEventListeners();
-            
-            this.isInitialized = true;
-            debugLog('트래커 초기화 완료', { sessionId: this.sessionId });
+            try {
+                if (this.isInitialized) return;
+                
+                debugLog('트래커 초기화 시작');
+                
+                this.sessionId = Utils.getCookie(CONFIG.sessionCookieName) || Utils.generateSessionId();
+                Utils.setCookie(CONFIG.sessionCookieName, this.sessionId, 1); // 1일 세션
+                
+                this.checkAgentLink();
+                this.setupEventListeners();
+                
+                this.isInitialized = true;
+                debugLog('트래커 초기화 완료', { sessionId: this.sessionId });
+            } catch (error) {
+                debugLog('초기화 중 오류 발생 (조용히 실패):', error);
+                // 초기화 실패해도 페이지는 정상 작동
+            }
         },
         
         // 에이전트 링크 확인
@@ -311,21 +319,28 @@
                 }
             };
             
-            // History API 감지
-            const originalPushState = history.pushState;
-            const originalReplaceState = history.replaceState;
-            
-            history.pushState = function() {
-                originalPushState.apply(history, arguments);
-                setTimeout(checkUrlChange, 0);
-            };
-            
-            history.replaceState = function() {
-                originalReplaceState.apply(history, arguments);
-                setTimeout(checkUrlChange, 0);
-            };
-            
-            window.addEventListener('popstate', checkUrlChange);
+            // History API 감지 (다른 스크립트와 충돌 방지)
+            try {
+                const originalPushState = history.pushState;
+                const originalReplaceState = history.replaceState;
+                
+                // 이미 오버라이드된 경우 감지
+                if (originalPushState.toString().indexOf('Ganpoom') === -1) {
+                    history.pushState = function() {
+                        originalPushState.apply(history, arguments);
+                        setTimeout(checkUrlChange, 0);
+                    };
+                    
+                    history.replaceState = function() {
+                        originalReplaceState.apply(history, arguments);
+                        setTimeout(checkUrlChange, 0);
+                    };
+                }
+                
+                window.addEventListener('popstate', checkUrlChange);
+            } catch (e) {
+                debugLog('History API 감지 설정 실패 (무시됨):', e);
+            }
         }
     };
     
@@ -342,15 +357,26 @@
         }
     };
     
-    // 페이지 로드 시 자동 초기화
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            GanpoomTracker.init();
-        });
-    } else {
-        GanpoomTracker.init();
+    // 페이지 로드 시 자동 초기화 (안전하게)
+    try {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                GanpoomTracker.init();
+            });
+        } else {
+            // 약간의 지연을 두어 다른 스크립트와 충돌 방지
+            setTimeout(function() {
+                GanpoomTracker.init();
+            }, 0);
+        }
+    } catch (error) {
+        console.error('[Ganpoom Tracker] 초기화 스케줄링 오류:', error);
     }
     
     debugLog('Ganpoom 트래커 스크립트 로드 완료');
     
+    } catch (error) {
+        // 스크립트 오류 발생 시 조용히 실패 (페이지에 영향 없음)
+        console.error('[Ganpoom Tracker] 초기화 오류:', error);
+    }
 })();
