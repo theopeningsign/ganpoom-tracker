@@ -266,19 +266,14 @@
             document.addEventListener('submit', function(e) {
                 const form = e.target;
                 
-                // ganpoom.com의 견적요청 폼 감지 (여러 패턴 지원)
+                // ganpoom.com의 실제 견적요청 폼 감지
+                // 실제 form action: rfp_estimate
+                // 실제 폼 필드: svc_type, req_type, title, area, phone 등
                 const isQuoteForm = 
-                    form.action.includes('rfp') ||
-                    form.action.includes('estimate') ||
-                    form.action.includes('quote') ||
-                    form.id.includes('quote') ||
-                    form.id.includes('rfp') ||
-                    form.id.includes('estimate') ||
-                    form.className.includes('quote') ||
-                    form.className.includes('rfp') ||
-                    form.querySelector('[name*="quote"]') ||
-                    form.querySelector('[name*="estimate"]') ||
-                    form.querySelector('[name*="rfp"]');
+                    form.action.includes('rfp_estimate') ||
+                    form.querySelector('[name="svc_type"]') !== null ||
+                    form.querySelector('[name="req_type"]') !== null ||
+                    (form.querySelector('[name="title"]') !== null && form.querySelector('[name="area"]') !== null);
                 
                 if (isQuoteForm) {
                     debugLog('견적요청 폼 제출 감지:', form);
