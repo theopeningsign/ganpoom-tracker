@@ -1,0 +1,41 @@
+NEXT_PUBLIC_SUPABASE_URL = https://jxhwlwftwhqkvnhbjacm.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4aHdsd2Z0d2hxa3ZuaGJqYWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNjIwNjMsImV4cCI6MjA3ODYzODA2M30.ScVCizlk_QTAixKRJtQSl9Tpg4QAU1ULWPQbtkxvRHE
+SUPABASE_SERVICE_ROLE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4aHdsd2Z0d2hxa3ZuaGJqYWNtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzA2MjA2MywiZXhwIjoyMDc4NjM4MDYzfQ.n0Vwta_nTVpRHFQ6SpsO7_cdrPWUJR6_h-sphbeeeQ0
+NEXT_PUBLIC_SITE_URL = https://www.ganpoom.com
+NODE_ENV = production
+
+데이터베이스에 저장되는 데이터 요약
+1. agents 테이블 (에이전트 정보)
+id, name, phone, email, account_number, memo
+commission_rate, commission_per_quote
+is_active, created_at, updated_at
+
+2. link_clicks 테이블 (클릭 로그)
+현재 저장:
+agent_id, ip_address, user_agent, referrer, landing_page, session_id, clicked_at
+3. quote_requests 테이블 (견적요청 로그)
+현재 저장 중:
+ganpoom.com 폼 필드들 (svc_type, req_type, title, area, phone, floor, setup_date, deadline, texture, comments, signs, wanted_partner, blogo, destroy, is_direct_call, recv_req_count, safe, event_type, need_skb)
+중복 필드 (customer_name, customer_phone, service_type, details)
+추적 정보 (ip_address, user_agent, session_id)
+estimated_value (null)
+commission_amount (null → 정산 시 업데이트)
+status, settlement_month, is_settled
+4. user_sessions 테이블 (세션 정보)
+세션 ID, 에이전트 ID, IP, User Agent, 디바이스 정보, 브라우저, OS, 페이지뷰 수, 세션 지속 시간, 바운스 여부, 전환 여부 등
+5. page_views 테이블 (페이지뷰 로그)
+페이지 URL, 제목, 체류 시간, 스크롤 깊이 등
+불필요해 보이는 것들
+page_views 테이블 — 페이지뷰 상세 추적 불필요 시 제거 가능
+user_sessions의 상세 정보 — IP, User Agent, 디바이스/브라우저/OS, 페이지뷰 수, 세션 지속 시간, 바운스 등
+quote_requests의 과다한 폼 필드 — 필요한 것만 남기고 나머지 제거 가능
+중복 필드 — customer_name/customer_phone/service_type/details
+추적 정보 — IP, User Agent, session_id (필요 여부 확인)
+link_clicks의 상세 정보 — IP, User Agent, referrer 등
+추천 정리
+단순하게 하려면:
+link_clicks: agent_id, clicked_at만 (클릭 수만 카운트)
+quote_requests: agent_id, phone, title, created_at, commission_amount, status, settlement_month, is_settled만 (견적요청 건수 + 정산 정보)
+user_sessions: 최소화 또는 제거
+page_views: 제거
+어떤 것들을 제거할지 알려주세요.

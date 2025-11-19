@@ -128,6 +128,10 @@
         sessionId: null,
         agentData: null,
         isInitialized: false,
+        // 중복 방지를 위한 변수
+        lastTrackedEvent: null,
+        lastTrackedTime: 0,
+        pendingFormSubmit: false, // form submit이 예상되는지
         
         // 초기화
         init: function() {
@@ -199,11 +203,26 @@
             }
         },
         
-        // 이벤트 추적
+        // 이벤트 추적 (중복 방지 포함)
         trackEvent: function(eventType, eventData = {}) {
             if (!this.agentData) {
                 debugLog('에이전트 데이터 없음 - 추적 건너뜀');
-                return;
+                return false;
+            }
+            
+            // 중복 방지: 같은 이벤트를 2초 내에 다시 추적하지 않음
+            const now = Date.now();
+            if (this.lastTrackedEvent === 'conversion' && 
+                eventType === 'conversion' &&
+                now - this.lastTrackedTime < 2000) {
+                debugLog('중복 이벤트 방지 - 최근에 같은 이벤트 추적됨');
+                return false;
+            }
+            
+            // 추적 기록 업데이트
+            if (eventType === 'conversion') {
+                this.lastTrackedEvent = 'conversion';
+                this.lastTrackedTime = now;
             }
             
             const trackingData = {
@@ -224,6 +243,7 @@
             }
             
             Utils.sendEvent(endpoint, trackingData);
+            return true;
         },
         
         // 견적요청 추적 (메인 컨버전)
@@ -263,18 +283,88 @@
                 if (isQuoteForm) {
                     debugLog('견적요청 폼 제출 감지:', form);
                     
+                    // form submit이 발생하면 pendingFormSubmit 플래그 설정
+                    self.pendingFormSubmit = true;
+                    
                     const formData = new FormData(form);
                     const formObject = {};
                     formData.forEach((value, key) => {
                         formObject[key] = value;
                     });
                     
-                    self.trackQuoteRequest(formObject);
+                    // form submit으로 추적 (우선순위 높음)
+                    if (self.trackQuoteRequest(formObject)) {
+                        // 추적 성공하면 잠시 후 플래그 해제
+                        setTimeout(function() {
+                            self.pendingFormSubmit = false;
+                        }, 500);
+                    }
                 }
             });
             
+            // 1-1. "신청완료" 버튼 클릭 감지 (포트폴리오 상담신청)
+            document.addEventListener('click', function(e) {
+                const button = e.target.closest('button');
+                
+                // "신청완료" 버튼 감지
+                if (button && button.textContent && button.textContent.trim() === '신청완료') {
+                    // form submit이 곧 발생할 것으로 예상되면 무시 (중복 방지)
+                    if (self.pendingFormSubmit) {
+                        debugLog('신청완료 버튼 클릭 무시 - form submit 예상');
+                        return;
+                    }
+                    
+                    // 버튼이 form 안에 있는지 확인
+                    const form = button.closest('form');
+                    if (form) {
+                        // form 안에 있으면 form submit이 처리할 것임
+                        debugLog('신청완료 버튼이 form 안에 있음 - form submit 대기');
+                        self.pendingFormSubmit = true;
+                        return;
+                    }
+                    
+                    debugLog('포트폴리오 상담신청 버튼 클릭 감지:', button);
+                    
+                    // 폼 데이터 수집 (근처의 입력 필드들)
+                    const formObject = {};
+                    
+                    // req_detail로 시작하는 필드들 수집
+                    const detailInputs = document.querySelectorAll('input[id*="req_detail"], input[name*="req_detail"]');
+                    detailInputs.forEach(function(input) {
+                        const key = input.id || input.name || 'unknown';
+                        formObject[key] = input.value || '';
+                    });
+                    
+                    // dl/dt/dd 구조에서도 데이터 수집 시도
+                    const dlElements = button.closest('dl') || document.querySelectorAll('dl');
+                    if (dlElements.length > 0) {
+                        const firstDl = dlElements[0] instanceof NodeList ? dlElements[0][0] : dlElements[0];
+                        if (firstDl) {
+                            const inputs = firstDl.querySelectorAll('input');
+                            inputs.forEach(function(input) {
+                                const key = input.id || input.name || input.placeholder || 'field';
+                                if (!formObject[key]) {
+                                    formObject[key] = input.value || '';
+                                }
+                            });
+                        }
+                    }
+                    
+                    // 포트폴리오 상담신청으로 추적 (버튼 클릭으로 처리)
+                    if (self.trackQuoteRequest(formObject)) {
+                        debugLog('포트폴리오 상담신청 추적 완료');
+                    }
+                }
+            }, true); // capture phase에서 실행하여 다른 이벤트보다 먼저 처리
+            
             // 2. 전화번호 클릭 감지
             document.addEventListener('click', function(e) {
+                // "신청완료" 버튼이면 무시 (이미 처리됨)
+                const button = e.target.closest('button');
+                if (button && button.textContent && button.textContent.trim() === '신청완료') {
+                    return;
+                }
+                
                 const target = e.target.closest('a[href^="tel:"]');
                 if (target && self.agentData) {
                     debugLog('전화번호 클릭 감지:', target.href);
@@ -287,6 +377,12 @@
             
             // 3. 카카오톡 상담 클릭 감지
             document.addEventListener('click', function(e) {
+                // "신청완료" 버튼이면 무시 (이미 처리됨)
+                const button = e.target.closest('button');
+                if (button && button.textContent && button.textContent.trim() === '신청완료') {
+                    return;
+                }
+                
                 const target = e.target.closest('a[href*="kakao"], a[href*="pf.kakao"], .kakao-chat, .kakao-consult');
                 if (target && self.agentData) {
                     debugLog('카카오톡 상담 클릭 감지:', target);
