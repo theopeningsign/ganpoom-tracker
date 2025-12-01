@@ -9,6 +9,14 @@ function getClientIP(req) {
          '127.0.0.1'
 }
 
+// 전화번호 정규화 (하이픈, 공백 제거)
+function normalizePhone(phone) {
+  if (!phone) return null
+  const cleaned = phone.replace(/[^0-9]/g, '')
+  // 최소 길이만 체크 (너무 짧으면 무효)
+  return cleaned.length >= 8 ? cleaned : null
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -52,6 +60,55 @@ export default async function handler(req, res) {
     // 클라이언트 정보 수집
     const ipAddress = getClientIP(req)
     const userAgent = req.headers['user-agent'] || ''
+    const normalizedPhone = normalizePhone(formData.phone)
+
+    // ====== 중복 체크: 실수 클릭 방지 (1분 이내) ======
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString()
+
+    // 1단계: 세션 + 전화번호 (가장 정확)
+    if (sessionId && normalizedPhone) {
+      const { data: exactMatch } = await supabaseAdmin
+        .from('quote_requests')
+        .select('id, created_at')
+        .eq('agent_id', agentId)
+        .eq('session_id', sessionId)
+        .eq('customer_phone', normalizedPhone)
+        .gte('created_at', oneMinuteAgo)
+        .maybeSingle()
+
+      if (exactMatch) {
+        console.log('중복 견적요청 감지 - 세션+전화번호:', sessionId)
+        return res.status(200).json({ 
+          success: true,
+          isDuplicate: true,
+          message: 'Duplicate conversion (same session + phone)',
+          quoteId: exactMatch.id
+        })
+      }
+    }
+
+    // 2단계: 세션만 (전화번호 없을 때)
+    if (sessionId && !normalizedPhone) {
+      const { data: sessionMatch } = await supabaseAdmin
+        .from('quote_requests')
+        .select('id, created_at')
+        .eq('agent_id', agentId)
+        .eq('session_id', sessionId)
+        .gte('created_at', oneMinuteAgo)
+        .maybeSingle()
+
+      if (sessionMatch) {
+        console.log('중복 견적요청 감지 - 세션:', sessionId)
+        return res.status(200).json({ 
+          success: true,
+          isDuplicate: true,
+          message: 'Duplicate conversion (same session)',
+          quoteId: sessionMatch.id
+        })
+      }
+    }
+
+    // ====== 중복 체크 통과 - 견적요청 기록 ======
 
     // ganpoom.com 견적요청 기록
     const { data: quoteData, error: quoteError } = await supabaseAdmin
@@ -84,7 +141,7 @@ export default async function handler(req, res) {
           
           // 호환성을 위한 기존 필드들
           customer_name: formData.title || formData.name || null,
-          customer_phone: formData.phone || null,
+          customer_phone: normalizedPhone || formData.phone || null, // 정규화된 전화번호 저장
           service_type: formData.svc_type || formData.service || null,
           details: formData.comments || formData.details || null,
           
@@ -105,35 +162,44 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Failed to record conversion' })
     }
 
-    // 세션 전환 상태 업데이트
+    // 세션 전환 상태 업데이트 (실패해도 계속 진행)
     if (sessionId) {
-      await supabaseAdmin
+      const { error: sessionError } = await supabaseAdmin
         .from('user_sessions')
         .update({ 
           converted: true,
           ended_at: new Date().toISOString()
         })
         .eq('id', sessionId)
+      
+      if (sessionError) {
+        console.warn('⚠️ 세션 업데이트 실패 (무시):', sessionError)
+      }
     }
 
-    // 실시간 알림 발송 (Supabase Realtime 사용)
-    await supabaseAdmin
-      .channel('quote_requests')
-      .send({
-        type: 'broadcast',
-        event: 'new_quote',
-        payload: {
-          agentId: agentId,
-          agentName: agent.name,
-          customerName: formData.name,
-          serviceType: formData.service,
-          timestamp: new Date().toISOString()
-        }
-      })
+    // 실시간 알림 발송 (실패해도 계속 진행)
+    try {
+      await supabaseAdmin
+        .channel('quote_requests')
+        .send({
+          type: 'broadcast',
+          event: 'new_quote',
+          payload: {
+            agentId: agentId,
+            agentName: agent.name,
+            customerName: formData.name || formData.title,
+            serviceType: formData.service || formData.svc_type,
+            timestamp: new Date().toISOString()
+          }
+        })
+    } catch (notifyError) {
+      console.warn('⚠️ 실시간 알림 실패 (무시):', notifyError)
+    }
 
     res.status(200).json({
       success: true,
-      quoteId: quoteData.id
+      quoteId: quoteData.id,
+      isDuplicate: false
     })
 
   } catch (error) {

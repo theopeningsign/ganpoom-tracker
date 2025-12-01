@@ -278,12 +278,72 @@
         trackQuoteRequest: function(formData = {}) {
             debugLog('견적요청 추적 시작:', formData);
             
-            // 단순히 견적요청만 추적 (예상 금액 계산 제거)
-            this.trackEvent('conversion', {
-                conversionType: 'quote_request',
-                formData: formData
-                // estimatedValue 제거 - 단순히 견적요청 건수만 추적
-            });
+            if (!this.agentData) {
+                debugLog('에이전트 데이터 없음 - 견적요청 추적 불가');
+                return false;
+            }
+            
+            // 클라이언트 측 추가 안전장치: sessionStorage 체크
+            const conversionKey = `ganpoom_conversion_${this.sessionId}`;
+            const pendingKey = conversionKey + '_pending';
+            
+            // 처리 중 플래그 체크 (race condition 방지)
+            if (sessionStorage.getItem(pendingKey)) {
+                debugLog('⚠️ 견적요청 처리 중 - 중복 차단');
+                return false;
+            }
+            
+            // 즉시 플래그 설정
+            sessionStorage.setItem(pendingKey, Date.now().toString());
+            
+            try {
+                // 기존 전환 체크
+                const existingConversion = sessionStorage.getItem(conversionKey);
+                if (existingConversion) {
+                    const conversionData = JSON.parse(existingConversion);
+                    const timeDiff = Date.now() - new Date(conversionData.timestamp).getTime();
+                    
+                    // 1분 이내면 중복으로 간주
+                    if (timeDiff < 60000) {
+                        debugLog('⚠️ 1분 이내 중복 견적요청 차단');
+                        return false;
+                    }
+                }
+                
+                // 2초 내 중복 방지 (추가 안전장치)
+                const now = Date.now();
+                if (this.lastTrackedEvent === 'conversion' && 
+                    now - this.lastTrackedTime < 2000) {
+                    debugLog('⚠️ 2초 이내 중복 차단');
+                    return false;
+                }
+                
+                // 견적요청 추적
+                const success = this.trackEvent('conversion', {
+                    conversionType: 'quote_request',
+                    formData: formData
+                });
+                
+                if (success) {
+                    // 추적 성공 시 sessionStorage 플래그 설정
+                    sessionStorage.setItem(conversionKey, JSON.stringify({
+                        timestamp: new Date().toISOString(),
+                        agentId: this.agentData.agentId
+                    }));
+                    
+                    // 추적 기록 업데이트
+                    this.lastTrackedEvent = 'conversion';
+                    this.lastTrackedTime = now;
+                    
+                    debugLog('✅ 견적요청 추적 완료');
+                }
+                
+                return success;
+                
+            } finally {
+                // 항상 pending 플래그 제거
+                sessionStorage.removeItem(pendingKey);
+            }
         },
         
         // 이벤트 리스너 설정
