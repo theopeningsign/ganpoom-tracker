@@ -47,6 +47,7 @@ export default async function handler(req, res) {
       agentId, 
       sessionId, 
       referrer, 
+      referrerDomain,
       landingPage 
     } = req.body
 
@@ -80,7 +81,8 @@ export default async function handler(req, res) {
           agent_id: agentId,
           ip_address: ipAddress,
           user_agent: userAgent,
-          referrer: referrer || null,
+          referrer: referrer || null, // 원본 URL
+          referrer_domain: referrerDomain || null, // 파싱된 도메인만
           landing_page: landingPage || 'https://www.ganpoom.com',
           session_id: sessionId
         }

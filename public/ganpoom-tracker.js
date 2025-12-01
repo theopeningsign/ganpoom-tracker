@@ -112,12 +112,36 @@
             }
         },
         
+        // Referrer URL 파싱 (도메인만 추출)
+        parseReferrer: function(referrerUrl) {
+            if (!referrerUrl || referrerUrl === '') {
+                return {
+                    domain: null
+                };
+            }
+            
+            try {
+                const url = new URL(referrerUrl);
+                const domain = url.hostname.replace('www.', '');
+                return {
+                    domain: domain
+                };
+            } catch (e) {
+                // URL 파싱 실패 시 null 반환
+                return {
+                    domain: null
+                };
+            }
+        },
+        
         // 현재 페이지 정보 수집
         getPageInfo: function() {
+            const referrerInfo = this.parseReferrer(document.referrer);
             return {
                 url: window.location.href,
                 title: document.title,
                 referrer: document.referrer,
+                referrerDomain: referrerInfo.domain,
                 timestamp: new Date().toISOString()
             };
         }
@@ -179,11 +203,15 @@
                 
                 debugLog('새 에이전트 링크 감지:', agentData);
                 
+                // Referrer 정보 파싱 (도메인만 추출)
+                const referrerInfo = Utils.parseReferrer(document.referrer);
+                
                 // 링크 클릭 이벤트 전송
                 this.trackEvent('click', {
                     agentId: agentData.agentId,
                     sessionId: this.sessionId,
                     referrer: document.referrer,
+                    referrerDomain: referrerInfo.domain,
                     landingPage: window.location.href,
                     utmData: agentData.utmData
                 });

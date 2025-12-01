@@ -20,7 +20,8 @@ CREATE TABLE link_clicks (
     agent_id VARCHAR(6) REFERENCES agents(id),
     ip_address INET, -- 클릭한 IP
     user_agent TEXT, -- 브라우저 정보
-    referrer TEXT, -- 유입 경로
+    referrer TEXT, -- 유입 경로 (원본 URL)
+    referrer_domain VARCHAR(255), -- 유입 도메인 (blog.naver.com, instagram.com 등)
     landing_page TEXT, -- 랜딩 페이지
     session_id VARCHAR(50), -- 세션 ID
     clicked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
