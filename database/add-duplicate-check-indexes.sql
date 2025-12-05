@@ -18,3 +18,5 @@ WHERE customer_phone IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_link_clicks_attribution 
 ON link_clicks(agent_id, session_id, clicked_at DESC);
 
+
+

@@ -20,3 +20,5 @@ CREATE INDEX IF NOT EXISTS idx_link_clicks_referrer_domain ON link_clicks(referr
 --   END
 -- WHERE referrer_domain IS NULL;
 
+
+

@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const endISO = todayEnd.toISOString()
 
     const [recentQuotesResult, topAgentsResult, monthlyQueries, todayQuotesResult] = await Promise.all([
-      // 최근 견적요청 목록 (최대 10개)
+      // 최근 견적요청 목록 (최대 10개) - 활성 에이전트만
       supabaseAdmin
         .from('quote_requests')
         .select(`
@@ -49,8 +49,9 @@ export default async function handler(req, res) {
           service_type,
           estimated_value,
           created_at,
-          agents!inner(name)
+          agents!inner(name, is_active)
         `)
+        .eq('agents.is_active', true)
         .order('created_at', { ascending: false })
         .limit(10),
       
@@ -88,7 +89,8 @@ export default async function handler(req, res) {
       })(),
       supabaseAdmin
         .from('quote_requests')
-        .select('agent_id, agents!inner(name)')
+        .select('agent_id, agents!inner(name, is_active)')
+        .eq('agents.is_active', true)
         .gte('created_at', startISO)
         .lte('created_at', endISO)
     ])
