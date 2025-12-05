@@ -21,17 +21,19 @@ export default async function handler(req, res) {
         end: nextMonth.toISOString()
       })
       
-      // 월별 클릭 수와 견적요청 수를 병렬로 조회
+      // 월별 클릭 수와 견적요청 수를 병렬로 조회 - 활성 에이전트만
       monthlyQueries.push(
         Promise.all([
           supabaseAdmin
             .from('link_clicks')
-            .select('*', { count: 'exact' })
+            .select('agent_id, agents!inner(is_active)', { count: 'exact' })
+            .eq('agents.is_active', true)
             .gte('clicked_at', monthDate.toISOString())
             .lt('clicked_at', nextMonth.toISOString()),
           supabaseAdmin
             .from('quote_requests')
-            .select('*', { count: 'exact' })
+            .select('agent_id, agents!inner(is_active)', { count: 'exact' })
+            .eq('agents.is_active', true)
             .gte('created_at', monthDate.toISOString())
             .lt('created_at', nextMonth.toISOString())
         ])
@@ -78,17 +80,19 @@ export default async function handler(req, res) {
         end: dayEnd
       })
       
-      // 클릭 수와 견적요청을 병렬로 조회
+      // 클릭 수와 견적요청을 병렬로 조회 - 활성 에이전트만
       dailyQueries.push(
         Promise.all([
           supabaseAdmin
             .from('link_clicks')
-            .select('*', { count: 'exact' })
+            .select('agent_id, agents!inner(is_active)', { count: 'exact' })
+            .eq('agents.is_active', true)
             .gte('clicked_at', dayStart)
             .lte('clicked_at', dayEnd),
           supabaseAdmin
             .from('quote_requests')
-            .select('commission_amount')
+            .select('commission_amount, agents!inner(is_active)')
+            .eq('agents.is_active', true)
             .gte('created_at', dayStart)
             .lte('created_at', dayEnd)
         ])

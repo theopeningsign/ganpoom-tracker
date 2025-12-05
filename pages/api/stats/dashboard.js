@@ -14,15 +14,17 @@ export default async function handler(req, res) {
         .select('*', { count: 'exact' })
         .eq('is_active', true),
       
-      // 전체 클릭 수
+      // 전체 클릭 수 - 활성 에이전트만
       supabaseAdmin
         .from('link_clicks')
-        .select('*', { count: 'exact' }),
+        .select('agent_id, agents!inner(is_active)', { count: 'exact' })
+        .eq('agents.is_active', true),
       
-      // 전체 견적요청 수
+      // 전체 견적요청 수 - 활성 에이전트만
       supabaseAdmin
         .from('quote_requests')
-        .select('*', { count: 'exact' })
+        .select('agent_id, agents!inner(is_active)', { count: 'exact' })
+        .eq('agents.is_active', true)
     ])
 
     const totalAgents = agentsResult.count || 0
@@ -79,7 +81,8 @@ export default async function handler(req, res) {
           queries.push(
             supabaseAdmin
               .from('quote_requests')
-              .select('commission_amount')
+              .select('commission_amount, agents!inner(is_active)')
+              .eq('agents.is_active', true)
               .gte('created_at', monthDate.toISOString())
               .lt('created_at', nextMonth.toISOString())
           )
