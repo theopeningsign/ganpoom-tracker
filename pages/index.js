@@ -1,690 +1,360 @@
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts'
+import * as XLSX from 'xlsx'
 import PasswordProtection from '../components/PasswordProtection'
 
-export default function HomePage({
-  initialStats,
-  initialRecentQuotes,
-  initialTodayQuotes
-}) {
-  const defaultStats = initialStats || {
-    totalAgents: 0,
-    totalClicks: 0,
-    totalQuotes: 0,
-    conversionRate: 0
-  }
+const CHANNEL_LABELS = {
+  'naver.searchad': '네이버 검색광고',
+  'google': '구글 광고',
+  'tenping_web': '텐핑',
+  'agency': 'CPA 에이전시',
+  'naver_blog_official': '네이버 블로그',
+  'instagram_official': '인스타그램',
+  'unattributed': '자연유입',
+}
 
-  const [stats, setStats] = useState(defaultStats)
-  const [recentQuotes, setRecentQuotes] = useState(initialRecentQuotes || [])
-  const [todayQuotes, setTodayQuotes] = useState(initialTodayQuotes || [])
-  const [agentModal, setAgentModal] = useState({
-    open: false,
-    loading: false,
-    data: null,
-    error: ''
-  })
-  const [loading, setLoading] = useState(!initialStats)
+const CHANNEL_COLORS = {
+  'naver.searchad': '#03C75A',
+  'google': '#4285F4',
+  'tenping_web': '#FF6B35',
+  'agency': '#9B59B6',
+  'naver_blog_official': '#00C73C',
+  'instagram_official': '#E1306C',
+  'unattributed': '#95A5A6',
+}
 
-  useEffect(() => {
-    loadRealTimeStats()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // 빈 배열로 한 번만 실행
+const TYPE_BADGE = {
+  paid: { label: '유료', bg: '#fff3cd', color: '#856404' },
+  organic: { label: '오가닉', bg: '#d1ecf1', color: '#0c5460' },
+  cpa: { label: 'CPA', bg: '#f8d7da', color: '#721c24' },
+}
 
-  const loadRealTimeStats = async () => {
-    try {
-      // 실제 API에서 대시보드 통계 가져오기
-      const response = await fetch('/api/stats/dashboard')
-      
-      if (response.ok) {
-        const result = await response.json()
-        
-        // 실제 통계 데이터 설정
-        setStats({
-          totalAgents: result.stats.totalAgents,
-          totalClicks: result.stats.totalClicks,
-          totalQuotes: result.stats.totalQuotes,
-          conversionRate: result.stats.conversionRate
-        })
-        
-        // 최근 견적요청, 오늘 견적요청 설정
-        setRecentQuotes(result.recentQuotes || [])
-        setTodayQuotes(result.todayQuotes || [])
-        
-        setLoading(false)
-        return
-      } else {
-        // API 호출 실패시 빈 데이터로 설정
-        throw new Error('Dashboard API 호출 실패')
-      }
+const CATEGORY_LABELS = {
+  'comparison.request': '비교견적 요청',
+  'order.complete': '주문 완료',
+  'simple.request': '간단 견적요청',
+  'home.screen': '홈화면 조회',
+  'airbridge.user.signup': '회원가입',
+  'airbridge.user.signin': '로그인',
+  'airbridge.ecommerce.order.completed': '주문완료',
+}
 
-    } catch (error) {
-      console.error('통계 로드 오류:', error)
-      // 에러 시 0으로 초기화
-      setStats({ totalAgents: 0, totalClicks: 0, totalQuotes: 0, conversionRate: 0 })
-      setRecentQuotes([])
-      setTodayQuotes([])
-    } finally {
-      setLoading(false)
-    }
-  }
+function getDefaultDates() {
+  const today = new Date()
+  const y = today.getFullYear()
+  const m = String(today.getMonth() + 1).padStart(2, '0')
+  const d = String(today.getDate()).padStart(2, '0')
+  return { startDate: `${y}-${m}-01`, endDate: `${y}-${m}-${d}` }
+}
 
-  const openAgentModal = async (agentId) => {
-    setAgentModal({ open: true, loading: true, data: null, error: '' })
-    try {
-      const response = await fetch(`/api/agents/detail?id=${agentId}`)
-      if (!response.ok) {
-        throw new Error('에이전트 정보를 불러오는데 실패했습니다.')
-      }
-      const result = await response.json()
-      if (!result.success) {
-        throw new Error(result.error || '에이전트 정보를 찾을 수 없습니다.')
-      }
-      setAgentModal({ open: true, loading: false, data: result.agent, error: '' })
-    } catch (error) {
-      console.error('에이전트 모달 로드 실패:', error)
-      setAgentModal({ open: true, loading: false, data: null, error: error.message || '에러가 발생했습니다.' })
-    }
-  }
-
-  const closeAgentModal = () => {
-    setAgentModal({ open: false, loading: false, data: null, error: '' })
-  }
-
-
+function StatCard({ label, value, sub, color }) {
   return (
-    <PasswordProtection>
-      <div style={{
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      minHeight: '100vh',
-      padding: '20px'
+    <div style={{
+      background: 'white', borderRadius: 12, padding: '20px 24px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderLeft: `4px solid ${color}`,
     }}>
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        background: 'white',
-        borderRadius: '15px',
-        overflow: 'hidden',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-      }}>
-        {/* 헤더 */}
-        <div style={{
-          background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-          color: 'white',
-          padding: '40px',
-          textAlign: 'center'
-        }}>
-          <h1 style={{ fontSize: '3rem', marginBottom: '15px', margin: 0 }}>
-            🚀 Ganpoom Tracker
-          </h1>
-          <p style={{ fontSize: '1.2rem', margin: 0, opacity: 0.9 }}>
-            에이전트 링크 성과를 실시간으로 추적하고 자동 정산까지 관리하세요
-          </p>
-        </div>
-
-        {/* 네비게이션 메뉴 */}
-        <div style={{
-          padding: '30px',
-          borderBottom: '1px solid #eee',
-          textAlign: 'center'
-        }}>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '20px',
-            marginTop: '20px'
-          }}>
-            <Link href="/admin/agents" style={{ 
-              textDecoration: 'none',
-              display: 'block',
-              padding: '40px',
-              background: '#4facfe',
-              color: 'white',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '15px' }}>👥</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '8px' }}>에이전트 관리</div>
-              <div style={{ fontSize: '1rem', opacity: 0.9 }}>새 에이전트 생성 및 관리</div>
-            </Link>
-
-            <Link href="/admin/analytics" style={{ 
-              textDecoration: 'none',
-              display: 'block',
-              padding: '40px',
-              background: '#11998e',
-              color: 'white',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '15px' }}>📊</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '8px' }}>상세 통계</div>
-              <div style={{ fontSize: '1rem', opacity: 0.9 }}>월별/일별 상세 분석</div>
-            </Link>
-
-            <Link href="/admin/settlement" style={{ 
-              textDecoration: 'none',
-              display: 'block',
-              padding: '40px',
-              background: '#fd79a8',
-              color: 'white',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '15px' }}>💰</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 'bold', marginBottom: '8px' }}>정산 관리</div>
-              <div style={{ fontSize: '1rem', opacity: 0.9 }}>월별 커미션 정산</div>
-            </Link>
-
-
-          </div>
-        </div>
-
-        {/* 실시간 통계 */}
-        <div style={{
-          padding: '30px',
-          borderBottom: '1px solid #eee'
-        }}>
-          <h2 style={{
-            color: '#333',
-            marginBottom: '25px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <span style={{
-              background: '#4facfe',
-              color: 'white',
-              width: '35px',
-              height: '35px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold'
-            }}>📈</span>
-            이번 달 통계 ({new Date().toLocaleDateString('ko-KR', { month: 'long' })})
-          </h2>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '20px',
-            marginTop: '20px'
-          }}>
-            <div style={{
-              textAlign: 'center',
-              padding: '25px 15px',
-              background: '#e3f2fd',
-              borderRadius: '12px',
-              border: '2px solid #bbdefb'
-            }}>
-              <div style={{
-                fontSize: '2.5rem',
-                fontWeight: 'bold',
-                color: '#1976d2',
-                marginBottom: '8px'
-              }}>{stats.totalAgents}</div>
-              <div style={{ fontSize: '0.9rem', color: '#666' }}>총 에이전트</div>
-            </div>
-
-            <div style={{
-              textAlign: 'center',
-              padding: '25px 15px',
-              background: '#e8f5e8',
-              borderRadius: '12px',
-              border: '2px solid #c8e6c9'
-            }}>
-              <div style={{
-                fontSize: '2.5rem',
-                fontWeight: 'bold',
-                color: '#388e3c',
-                marginBottom: '8px'
-              }}>{stats.totalClicks.toLocaleString()}</div>
-              <div style={{ fontSize: '0.9rem', color: '#666' }}>총 접속</div>
-            </div>
-
-            <div style={{
-              textAlign: 'center',
-              padding: '25px 15px',
-              background: '#fff3e0',
-              borderRadius: '12px',
-              border: '2px solid #ffcc02'
-            }}>
-              <div style={{
-                fontSize: '2.5rem',
-                fontWeight: 'bold',
-                color: '#f57c00',
-                marginBottom: '8px'
-              }}>{stats.totalQuotes}</div>
-              <div style={{ fontSize: '0.9rem', color: '#666' }}>견적 요청</div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* 최근 활동 */}
-        <div style={{
-          padding: '30px'
-        }}>
-          <h2 style={{
-            color: '#333',
-            marginBottom: '25px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <span style={{
-              background: '#4facfe',
-              color: 'white',
-              width: '35px',
-              height: '35px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold'
-            }}>📊</span>
-            오늘의 견적요청 건수
-          </h2>
-
-          <div style={{
-            background: '#f8f9fa',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            border: '1px solid #e9ecef'
-          }}>
-            <div style={{
-              padding: '20px',
-              background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-              borderBottom: '1px solid #dee2e6'
-            }}>
-              <h4 style={{ margin: 0, color: '#495057' }}>📊 에이전트별 견적요청 건수</h4>
-            </div>
-
-            <div style={{ padding: '0' }}>
-              {/* 스크롤 가능한 테이블 영역 */}
-              <div style={{
-                maxHeight: '400px',
-                overflowY: 'auto',
-                border: '1px solid #e9ecef',
-                borderRadius: '0 0 12px 12px'
-              }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ position: 'sticky', top: 0, background: '#f8f9fa', zIndex: 1 }}>
-                    <tr>
-                      <th style={{ padding: '15px', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontSize: '0.9rem', color: '#666' }}>순위</th>
-                      <th style={{ padding: '15px', textAlign: 'left', borderBottom: '2px solid #dee2e6', fontSize: '0.9rem', color: '#666' }}>에이전트</th>
-                      <th style={{ padding: '15px', textAlign: 'center', borderBottom: '2px solid #dee2e6', fontSize: '0.9rem', color: '#666' }}>견적요청</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                      {todayQuotes.length === 0 ? (
-                    <tr>
-                      <td colSpan="3" style={{ 
-                        padding: '40px', 
-                        textAlign: 'center', 
-                        color: '#666',
-                        fontStyle: 'italic'
-                      }}>
-                        아직 오늘 접수된 견적요청이 없습니다.<br/>
-                        에이전트를 통해 견적요청이 들어오면 자동으로 표시됩니다.
-                      </td>
-                    </tr>
-                    ) : (
-                      todayQuotes.map((agent, index) => (
-                        <tr
-                          key={agent.agentId}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => openAgentModal(agent.agentId)}
-                        >
-                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef' }}>{index + 1}</td>
-                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef', color: '#007bff', fontWeight: 'bold' }}>{agent.name}</td>
-                          <td style={{ padding: '15px', borderBottom: '1px solid #e9ecef', textAlign: 'center', fontWeight: 'bold' }}>
-                            {agent.quotes}
-                      </td>
-                    </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 총합 요약 - 실제 데이터 기반 */}
-              {todayQuotes.length > 0 && (
-                <div style={{
-                  padding: '15px 20px',
-                  background: 'linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%)',
-                  borderTop: '2px solid #28a745',
-                  borderRadius: '0 0 12px 12px'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    fontWeight: 'bold',
-                    color: '#155724',
-                    fontSize: '1rem'
-                  }}>
-                    <span>💡</span>
-                    <span>
-                      오늘 총 {todayQuotes.reduce((sum, agent) => sum + agent.quotes, 0)}건의 견적요청이 접수되었습니다
-                      (참여 에이전트: {todayQuotes.length}명)
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 빠른 액션 버튼 */}
-        <div style={{
-          padding: '30px'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '20px'
-          }}>
-            <Link href="/admin/agents" style={{ textDecoration: 'none' }}>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '16px',
-                padding: '30px',
-                textAlign: 'center',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease',
-                border: '1px solid rgba(79, 172, 254, 0.2)'
-              }}>
-                <div style={{
-                  fontSize: '48px',
-                  marginBottom: '15px'
-                }}>👥</div>
-                <h3 style={{
-                  margin: '0 0 10px 0',
-                  color: '#2c3e50',
-                  fontSize: '1.3rem'
-                }}>에이전트 관리</h3>
-                <p style={{
-                  margin: 0,
-                  color: '#7f8c8d',
-                  fontSize: '0.9rem'
-                }}>새 에이전트 생성 및 관리</p>
-              </div>
-            </Link>
-
-            <Link href="/admin/analytics" style={{ textDecoration: 'none' }}>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '16px',
-                padding: '30px',
-                textAlign: 'center',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease',
-                border: '1px solid rgba(17, 153, 142, 0.2)'
-              }}>
-                <div style={{
-                  fontSize: '48px',
-                  marginBottom: '15px'
-                }}>📊</div>
-                <h3 style={{
-                  margin: '0 0 10px 0',
-                  color: '#2c3e50',
-                  fontSize: '1.3rem'
-                }}>상세 통계</h3>
-                <p style={{
-                  margin: 0,
-                  color: '#7f8c8d',
-                  fontSize: '0.9rem'
-                }}>월별/일별 상세 분석</p>
-              </div>
-            </Link>
-
-            <Link href="/admin/settlement" style={{ textDecoration: 'none' }}>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '16px',
-                padding: '30px',
-                textAlign: 'center',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease',
-                border: '1px solid rgba(253, 121, 168, 0.2)'
-              }}>
-                <div style={{
-                  fontSize: '48px',
-                  marginBottom: '15px'
-                }}>💰</div>
-                <h3 style={{
-                  margin: '0 0 10px 0',
-                  color: '#2c3e50',
-                  fontSize: '1.3rem'
-                }}>정산 관리</h3>
-                <p style={{
-                  margin: 0,
-                  color: '#7f8c8d',
-                  fontSize: '0.9rem'
-                }}>월별 커미션 정산</p>
-            </div>
-            </Link>
-          </div>
-
-          {stats.totalAgents === 0 && (
-            <div style={{
-              marginTop: '40px',
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '16px',
-              padding: '40px',
-              textAlign: 'center',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-              border: '2px dashed #4facfe'
-            }}>
-              <div style={{
-                fontSize: '64px',
-                marginBottom: '20px'
-              }}>🚀</div>
-              <h2 style={{
-                margin: '0 0 15px 0',
-                color: '#2c3e50',
-                fontSize: '1.8rem'
-              }}>Ganpoom 트래킹 시작하기</h2>
-              <p style={{
-                margin: '0 0 30px 0',
-                color: '#7f8c8d',
-                fontSize: '1rem',
-                lineHeight: 1.6
-              }}>
-                아직 등록된 에이전트가 없습니다.<br/>
-                첫 번째 에이전트를 생성해서 추적을 시작하세요!
-              </p>
-            <Link href="/admin/agents" style={{ textDecoration: 'none' }}>
-              <button style={{
-                padding: '15px 40px',
-                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                color: 'white',
-                border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                  transition: 'transform 0.2s ease',
-                  boxShadow: '0 4px 15px rgba(79, 172, 254, 0.4)'
-              }}>
-                ✨ 첫 에이전트 생성하기
-              </button>
-            </Link>
-          </div>
-          )}
-        </div>
-      </div>
-
-
-      <style jsx>{`
-        @media (max-width: 768px) {
-          .grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: '#1a1a1a' }}>{value?.toLocaleString() ?? 0}</div>
+      {sub && <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>{sub}</div>}
     </div>
-      {agentModal.open && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}
-        onClick={closeAgentModal}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '30px',
-              maxWidth: '500px',
-            width: '90%',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
-            maxHeight: '80vh',
-              overflowY: 'auto'
-            }}
-          >
-            <h3 style={{ marginTop: 0, color: '#333', marginBottom: '20px' }}>에이전트 상세 정보</h3>
-            {agentModal.loading ? (
-              <p>불러오는 중...</p>
-            ) : agentModal.error ? (
-              <p style={{ color: 'red' }}>{agentModal.error}</p>
-            ) : agentModal.data ? (
-              <>
-                <div style={{ marginBottom: '15px' }}>
-                  <strong>이름:</strong> {agentModal.data.name}
-                </div>
-                <div style={{ marginBottom: '15px' }}>
-                  <strong>전화번호:</strong> {agentModal.data.phone}
-                </div>
-                {agentModal.data.email && (
-                  <div style={{ marginBottom: '15px' }}>
-                    <strong>이메일:</strong> {agentModal.data.email}
-                  </div>
-                )}
-                <div style={{ marginBottom: '15px' }}>
-                  <strong>계좌번호:</strong> {agentModal.data.account_number || '미등록'}
-                </div>
-                {agentModal.data.memo && (
-                  <div style={{ marginBottom: '15px' }}>
-                    <strong>메모:</strong> {agentModal.data.memo}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                  <div style={{
-                    flex: 1,
-                    background: '#e3f2fd',
-                    borderRadius: '12px',
-                    padding: '15px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1976d2' }}>
-                      {agentModal.data.totalClicks || 0}
-                </div>
-                    <div style={{ fontSize: '0.9rem', color: '#666' }}>총 접속수</div>
-              </div>
-                  <div style={{
-                    flex: 1,
-                    background: '#fff3e0',
-                    borderRadius: '12px',
-                    padding: '15px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f57c00' }}>
-                      {agentModal.data.totalQuotes || 0}
-              </div>
-                    <div style={{ fontSize: '0.9rem', color: '#666' }}>총 견적요청</div>
-            </div>
-            <div style={{
-                    flex: 1,
-              background: '#e8f5e8',
-              borderRadius: '12px',
-                    padding: '15px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2e7d32' }}>
-                      {agentModal.data.todayQuotes || 0}
-                </div>
-                    <div style={{ fontSize: '0.9rem', color: '#666' }}>오늘 견적요청</div>
-                  </div>
-                </div>
-              <button
-                  onClick={closeAgentModal}
-                style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                  color: 'white',
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                닫기
-              </button>
-              </>
-            ) : null}
-          </div>
-        </div>
-      )}
-    </PasswordProtection>
   )
 }
 
-export async function getServerSideProps(context) {
-  const protocol = context.req.headers['x-forwarded-proto'] || 'http'
-  const host = context.req.headers['host']
+const NAV = [
+  { href: '/', label: '대시보드', icon: '📊' },
+  { href: '/channels', label: '채널 분석', icon: '📡' },
+  { href: '/admin/agents', label: 'CPA 에이전트', icon: '👥' },
+  { href: '/admin/settlement', label: '정산 관리', icon: '💰' },
+]
 
-  try {
-    const response = await fetch(`${protocol}://${host}/api/stats/dashboard`, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      cache: 'no-store'
-    })
+function Sidebar({ current }) {
+  return (
+    <div style={{
+      position: 'fixed', left: 0, top: 0, bottom: 0, width: 220,
+      background: '#1a1d2e', color: 'white', padding: '24px 0', zIndex: 100,
+      display: 'flex', flexDirection: 'column'
+    }}>
+      <div style={{ padding: '0 20px 24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>Ganpoom</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Analytics</div>
+      </div>
+      <nav style={{ flex: 1, padding: '16px 0' }}>
+        {NAV.map(({ href, label, icon }) => (
+          <Link key={href} href={href} style={{ textDecoration: 'none' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 20px', fontSize: 14, color: 'rgba(255,255,255,0.75)',
+              background: href === current ? 'rgba(255,255,255,0.1)' : 'transparent',
+              borderLeft: href === current ? '3px solid #4facfe' : '3px solid transparent',
+            }}>
+              <span>{icon}</span><span>{label}</span>
+            </div>
+          </Link>
+        ))}
+      </nav>
+    </div>
+  )
+}
 
-    if (!response.ok) {
-      throw new Error('Dashboard API 호출 실패')
-    }
+export default function Dashboard() {
+  const [dates, setDates] = useState(getDefaultDates)
+  const [platform, setPlatform] = useState('all')
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
-    const result = await response.json()
+  const fetchStats = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      const res = await fetch(`/api/events/stats?${params}`)
+      const json = await res.json()
+      if (json.success) setData(json)
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
+  }, [dates, platform])
 
-    return {
-      props: {
-        initialStats: result.stats || null,
-        initialRecentQuotes: result.recentQuotes || [],
-        initialTodayQuotes: result.todayQuotes || []
-      }
-    }
-  } catch (error) {
-    console.error('SSR 대시보드 로드 오류:', error)
-    return {
-      props: {
-        initialStats: null,
-        initialRecentQuotes: [],
-        initialTodayQuotes: []
-      }
-    }
-  }
+  useEffect(() => { fetchStats() }, [fetchStats])
+
+  const exportCSV = useCallback(async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      const res = await fetch(`/api/events/export?${params}`)
+      const json = await res.json()
+      if (!json.success) return
+      const header = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Platform', 'Client IP City']
+      const rows = json.events.map(e => ({
+        'Event Category': e.event_category || '',
+        'Event Datetime': e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
+        'Channel': e.channel || 'unattributed',
+        'Campaign': e.campaign || '',
+        'Platform': e.device_type === 'mobile' ? (e.os_name || 'Mobile') : 'Desktop',
+        'Client IP City': e.client_ip_city || '',
+      }))
+      const csv = [header.join(','), ...rows.map(r => header.map(h => `"${(r[h]||'').replace(/"/g,'""')}"`).join(','))].join('\n')
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `ganpoom_${dates.startDate}_${dates.endDate}.csv`
+      a.click()
+    } catch (e) { console.error(e) }
+    finally { setExporting(false) }
+  }, [dates, platform])
+
+  const exportExcel = useCallback(async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      const res = await fetch(`/api/events/export?${params}`)
+      const json = await res.json()
+      if (!json.success) return
+      const rows = json.events.map(e => ({
+        'Event Category': e.event_category || '',
+        'Event Datetime': e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
+        'Channel': e.channel || 'unattributed',
+        'Campaign': e.campaign || '',
+        'Ad Group': e.ad_group || '',
+        'Ad Creative': e.ad_creative || '',
+        'Browser Referrer': e.referrer || '',
+        'Device Type': e.device_type || '',
+        'OS Name': e.os_name || '',
+        'Client IP City': e.client_ip_city || '',
+        'Client IP Subdivision': e.client_ip_subdivision || '',
+        'Platform': e.platform || 'web',
+        'UTM Source': e.utm_source || '',
+        'UTM Medium': e.utm_medium || '',
+        'UTM Campaign': e.utm_campaign || '',
+        'k_campaign': e.k_campaign || '',
+        'k_adgroup': e.k_adgroup || '',
+        'k_keyword': e.k_keyword || '',
+        'gclid': e.gclid || '',
+      }))
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [30,22,20,35,15,15,40,12,12,18,22,8,18,14,30,30,20,20,25].map(w => ({ wch: w }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Events')
+      XLSX.writeFile(wb, `ganpoom_${dates.startDate}_${dates.endDate}.xlsx`)
+    } catch (e) { console.error(e) }
+    finally { setExporting(false) }
+  }, [dates, platform])
+
+  return (
+    <PasswordProtection>
+      <div style={{ background: '#f5f6fa', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+        <Sidebar current="/" />
+        <div style={{ marginLeft: 220, padding: 32 }}>
+
+          {/* 헤더 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>대시보드</h1>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 전환 현황</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select value={platform} onChange={e => setPlatform(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, background: 'white' }}>
+                <option value="all">웹 + 앱</option>
+                <option value="web">웹</option>
+                <option value="app">앱</option>
+              </select>
+              <input type="date" value={dates.startDate}
+                onChange={e => setDates(p => ({ ...p, startDate: e.target.value }))}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+              <span style={{ color: '#888' }}>~</span>
+              <input type="date" value={dates.endDate}
+                onChange={e => setDates(p => ({ ...p, endDate: e.target.value }))}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+              <button onClick={fetchStats}
+                style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                조회
+              </button>
+              <button onClick={exportCSV} disabled={exporting}
+                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#555', fontSize: 13, cursor: 'pointer' }}>
+                CSV
+              </button>
+              <button onClick={exportExcel} disabled={exporting}
+                style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#217346', color: 'white', fontSize: 13, cursor: 'pointer' }}>
+                Excel
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 80, color: '#888' }}>불러오는 중...</div>
+          ) : !data ? (
+            <div style={{ textAlign: 'center', padding: 80, color: '#aaa' }}>데이터가 없습니다</div>
+          ) : (
+            <>
+              {/* 요약 카드 */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+                <StatCard label="전체 전환" value={data.summary.total} color="#4facfe" />
+                <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" />
+                <StatCard label="자연유입 / 블로그" value={data.summary.organic} sub="Organic" color="#27ae60" />
+                <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" />
+              </div>
+
+              {/* 채널 테이블 + 일별 추이 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+                <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                  <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>채널별 전환</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fafafa' }}>
+                        {['채널', '구분', '건수', '비율'].map(h => (
+                          <th key={h} style={{ padding: '10px 16px', textAlign: h === '건수' || h === '비율' ? 'right' : h === '구분' ? 'center' : 'left', fontSize: 12, color: '#888', fontWeight: 600 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.channelStats.length === 0 ? (
+                        <tr><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>데이터가 없습니다</td></tr>
+                      ) : data.channelStats.map(ch => {
+                        const badge = TYPE_BADGE[ch.channel_type] || TYPE_BADGE.organic
+                        const pct = data.summary.total > 0 ? ((ch.count / data.summary.total) * 100).toFixed(1) : '0.0'
+                        const color = CHANNEL_COLORS[ch.channel] || '#bbb'
+                        return (
+                          <tr key={ch.channel} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                                <span style={{ fontSize: 13, fontWeight: 500 }}>{CHANNEL_LABELS[ch.channel] || ch.channel}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: badge.bg, color: badge.color, fontWeight: 600 }}>{badge.label}</span>
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{ch.count.toLocaleString()}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#888' }}>{pct}%</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 20 }}>일별 전환 추이</div>
+                  {data.dailyStats.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 60, color: '#bbb', fontSize: 13 }}>데이터가 없습니다</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <LineChart data={data.dailyStats}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v.slice(5)} />
+                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                        <Tooltip formatter={v => [v + '건', '전환']} />
+                        <Line type="monotone" dataKey="total" stroke="#4facfe" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+
+              {/* 전환 유형 + 플랫폼/기기 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                  <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>전환 유형</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fafafa' }}>
+                        {['유형', '건수', '비율'].map(h => (
+                          <th key={h} style={{ padding: '10px 16px', textAlign: h !== '유형' ? 'right' : 'left', fontSize: 12, color: '#888', fontWeight: 600 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.categoryStats.length === 0 ? (
+                        <tr><td colSpan={3} style={{ padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>데이터가 없습니다</td></tr>
+                      ) : data.categoryStats.map(c => {
+                        const pct = data.summary.total > 0 ? ((c.count / data.summary.total) * 100).toFixed(1) : '0.0'
+                        return (
+                          <tr key={c.category} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                            <td style={{ padding: '12px 16px', fontSize: 13 }}>{CATEGORY_LABELS[c.category] || c.category}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{c.count.toLocaleString()}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#888' }}>{pct}%</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24 }}>
+                  <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 20 }}>플랫폼 / 기기</div>
+                  {[
+                    { title: '웹 / 앱', map: data.platformStats, labels: { web: '웹', app: '앱' }, colors: { web: '#4facfe', app: '#f39c12' } },
+                    { title: '기기 유형', map: data.deviceStats, labels: { desktop: '데스크톱', mobile: '모바일', tablet: '태블릿', unknown: '미확인' }, colors: { desktop: '#9b59b6', mobile: '#e74c3c', tablet: '#f39c12', unknown: '#bbb' } },
+                  ].map(({ title, map, labels, colors }) => (
+                    <div key={title} style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 12, color: '#888', marginBottom: 10, fontWeight: 600 }}>{title}</div>
+                      {Object.keys(map).length === 0 ? <div style={{ color: '#bbb', fontSize: 13 }}>데이터 없음</div> :
+                        Object.entries(map).map(([key, val]) => {
+                          const pct = data.summary.total > 0 ? (val / data.summary.total * 100).toFixed(1) : 0
+                          return (
+                            <div key={key} style={{ marginBottom: 8 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                                <span style={{ fontWeight: 500 }}>{labels[key] || key}</span>
+                                <span style={{ color: '#888' }}>{val}건 ({pct}%)</span>
+                              </div>
+                              <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
+                                <div style={{ height: '100%', width: `${pct}%`, background: colors[key] || '#bbb', borderRadius: 3 }} />
+                              </div>
+                            </div>
+                          )
+                        })
+                      }
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </PasswordProtection>
+  )
 }
