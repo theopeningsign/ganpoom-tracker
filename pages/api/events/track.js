@@ -137,6 +137,7 @@ export default async function handler(req, res) {
       referrer_domain: parseDomain(body.referrer),
       landing_page: body.landing_page || null,
 
+      client_ip: ip || null,
       client_ip_city: body.client_ip_city || ipLocation.client_ip_city || null,
       client_ip_subdivision: body.client_ip_subdivision || ipLocation.client_ip_subdivision || null,
 
