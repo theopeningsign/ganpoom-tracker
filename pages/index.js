@@ -42,12 +42,41 @@ const CATEGORY_LABELS = {
   'airbridge.ecommerce.order.completed': '주문완료',
 }
 
-function getDefaultDates() {
+function toYMD(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function getDateRange(preset) {
   const today = new Date()
-  const y = today.getFullYear()
-  const m = String(today.getMonth() + 1).padStart(2, '0')
-  const d = String(today.getDate()).padStart(2, '0')
-  return { startDate: `${y}-${m}-01`, endDate: `${y}-${m}-${d}` }
+  switch (preset) {
+    case 'today': {
+      const s = toYMD(today)
+      return { startDate: s, endDate: s }
+    }
+    case 'yesterday': {
+      const yest = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+      const s = toYMD(yest)
+      return { startDate: s, endDate: s }
+    }
+    case 'thisMonth': {
+      const first = new Date(today.getFullYear(), today.getMonth(), 1)
+      return { startDate: toYMD(first), endDate: toYMD(today) }
+    }
+    case 'lastMonth': {
+      const first = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+      const last = new Date(today.getFullYear(), today.getMonth(), 0) // 이번달 0일 = 지난달 말일
+      return { startDate: toYMD(first), endDate: toYMD(last) }
+    }
+    default:
+      return { startDate: toYMD(today), endDate: toYMD(today) }
+  }
+}
+
+function getDefaultDates() {
+  return getDateRange('today')
 }
 
 function StatCard({ label, value, sub, color }) {
@@ -99,8 +128,16 @@ function Sidebar({ current }) {
   )
 }
 
+const DATE_PRESETS = [
+  { key: 'today', label: '오늘' },
+  { key: 'yesterday', label: '어제' },
+  { key: 'thisMonth', label: '이번달' },
+  { key: 'lastMonth', label: '지난달' },
+]
+
 export default function Dashboard() {
   const [dates, setDates] = useState(getDefaultDates)
+  const [activePreset, setActivePreset] = useState('today')
   const [platform, setPlatform] = useState('all')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -195,29 +232,51 @@ export default function Dashboard() {
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 전환 현황</p>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* 플랫폼 */}
               <select value={platform} onChange={e => setPlatform(e.target.value)}
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, background: 'white' }}>
                 <option value="all">웹 + 앱</option>
                 <option value="web">웹</option>
                 <option value="app">앱</option>
               </select>
+
+              {/* 기간 프리셋 버튼 */}
+              <div style={{ display: 'flex', gap: 4, background: '#f0f2f5', borderRadius: 8, padding: 3 }}>
+                {DATE_PRESETS.map(({ key, label }) => (
+                  <button key={key} onClick={() => {
+                    const range = getDateRange(key)
+                    setDates(range)
+                    setActivePreset(key)
+                  }} style={{
+                    padding: '6px 12px', borderRadius: 6, border: 'none', fontSize: 12,
+                    fontWeight: activePreset === key ? 700 : 500, cursor: 'pointer',
+                    background: activePreset === key ? 'white' : 'transparent',
+                    color: activePreset === key ? '#4facfe' : '#666',
+                    boxShadow: activePreset === key ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                    transition: 'all 0.15s',
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {/* 직접 날짜 입력 */}
               <input type="date" value={dates.startDate}
-                onChange={e => setDates(p => ({ ...p, startDate: e.target.value }))}
-                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+                onChange={e => { setDates(p => ({ ...p, startDate: e.target.value })); setActivePreset('') }}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
               <span style={{ color: '#888' }}>~</span>
               <input type="date" value={dates.endDate}
-                onChange={e => setDates(p => ({ ...p, endDate: e.target.value }))}
-                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+                onChange={e => { setDates(p => ({ ...p, endDate: e.target.value })); setActivePreset('') }}
+                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+
               <button onClick={fetchStats}
-                style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                 조회
               </button>
               <button onClick={exportCSV} disabled={exporting}
-                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#555', fontSize: 13, cursor: 'pointer' }}>
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#555', fontSize: 13, cursor: 'pointer' }}>
                 CSV
               </button>
               <button onClick={exportExcel} disabled={exporting}
-                style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#217346', color: 'white', fontSize: 13, cursor: 'pointer' }}>
+                style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#217346', color: 'white', fontSize: 13, cursor: 'pointer' }}>
                 Excel
               </button>
             </div>
