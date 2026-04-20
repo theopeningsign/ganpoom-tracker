@@ -5,6 +5,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// IP → 도시/지역 (무료 API, rate limit 있음)
+async function getIpLocation(ip) {
+  if (!ip || ip === '::1' || ip.startsWith('127.') || ip.startsWith('192.168.')) return {}
+  try {
+    const res = await fetch(`https://ipapi.co/${ip}/json/`, { signal: AbortSignal.timeout(2000) })
+    if (!res.ok) return {}
+    const data = await res.json()
+    return {
+      client_ip_city: data.city || null,
+      client_ip_subdivision: data.region || null,
+    }
+  } catch (_) { return {} }
+}
+
 // 채널 타입 자동 분류
 function resolveChannelType(channel) {
   if (!channel) return 'organic'
@@ -26,12 +40,22 @@ function parseDomain(url) {
 }
 
 export default async function handler(req, res) {
+  // CORS - ganpoom.com 및 스테이징 허용
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.status(200).end()
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
     const body = req.body
+
+    // IP 추출 (프록시/로드밸런서 고려)
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
+    const ipLocation = await getIpLocation(ip)
 
     const channel = body.channel || body.utm_source || null
     const channelType = resolveChannelType(channel)
@@ -69,8 +93,8 @@ export default async function handler(req, res) {
       referrer_domain: parseDomain(body.referrer),
       landing_page: body.landing_page || null,
 
-      client_ip_city: body.client_ip_city || null,
-      client_ip_subdivision: body.client_ip_subdivision || null,
+      client_ip_city: body.client_ip_city || ipLocation.client_ip_city || null,
+      client_ip_subdivision: body.client_ip_subdivision || ipLocation.client_ip_subdivision || null,
 
       session_id: body.session_id || null,
     }

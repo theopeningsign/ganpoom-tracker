@@ -79,9 +79,18 @@
       const ios = /iPhone|iPad|iPod/i.test(ua);
       const android = /Android/i.test(ua);
       const mobile = ios || android || /Mobi/i.test(ua);
+
+      // WebView 감지 (ganpoom 앱 = WebView로 감싼 구조)
+      const isWebView =
+        /wv\b/.test(ua) ||                          // Android WebView
+        /FBAN|FBAV/.test(ua) ||                     // 페이스북 인앱
+        (ios && !/Safari/.test(ua) && /AppleWebKit/.test(ua)) || // iOS WebView (Safari 없음)
+        (android && /Version\/\d/.test(ua) && !/Chrome/.test(ua)); // Android 구형 WebView
+
       return {
         device_type: mobile ? 'mobile' : 'desktop',
         os_name: ios ? 'iOS' : android ? 'Android' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'macOS' : 'unknown',
+        platform: isWebView ? 'app' : 'web',  // WebView면 app으로 자동 설정
       };
     }
 
@@ -117,7 +126,7 @@
         const device = getDeviceInfo();
         const payload = {
           event_category: eventCategory,
-          platform: 'web',
+          platform: device.platform || 'web',
           ...device,
           channel: attr.channel || 'unattributed',
           campaign: attr.utm_campaign || attr.k_campaign || null,
