@@ -5,6 +5,43 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// 저장할 전환 이벤트 목록 (페이지뷰 제외)
+const ALLOWED_EVENTS = new Set([
+  'comparison.request',
+  'simple.request',
+  'order.complete',
+  'airbridge.user.signup',
+  'airbridge.user.signin',
+  'airbridge.ecommerce.order.completed',
+  'airbridge.ecommerce.product.addedToCart',
+  'comparison.contract',
+  'comparison.consult',
+  'consult.chat',
+  'phone.click',
+  'event.conversion',
+  'commerce.order.logo',
+  'commerce.order.neon',
+  'commerce.order.interior',
+  'commerce.order.btv',
+  'commerce.order.skb',
+  'commerce.order.toss',
+  'commerce.order.loud',
+  'commerce.order.NKS',
+  'commerce.order.ara',
+  'commerce.order.rictax',
+  'commerce.order.wallskin',
+  'commerce.order.cobosys',
+  'commerce.order.skbp',
+  'commerce.order.fromcobosys',
+])
+
+// 이벤트명 정규화 (ganpoomclient. 접두사 제거)
+function normalizeEvent(eventCategory) {
+  return eventCategory
+    .replace(/^ganpoomclient\./, '')
+    .replace(/^ganpoom\./, '')
+}
+
 // IP → 도시/지역 (무료 API, rate limit 있음)
 async function getIpLocation(ip) {
   if (!ip || ip === '::1' || ip.startsWith('127.') || ip.startsWith('192.168.')) return {}
@@ -53,6 +90,13 @@ export default async function handler(req, res) {
   try {
     const body = req.body
 
+    // 이벤트 필터링 - 전환 이벤트만 저장 (페이지뷰 제외)
+    const normalized = normalizeEvent(body.event_category || '')
+    const isAllowed = ALLOWED_EVENTS.has(normalized) || ALLOWED_EVENTS.has(body.event_category || '')
+    if (!isAllowed) {
+      return res.status(200).json({ success: true, skipped: true })
+    }
+
     // IP 추출 (프록시/로드밸런서 고려)
     const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
     const ipLocation = await getIpLocation(ip)
@@ -61,7 +105,7 @@ export default async function handler(req, res) {
     const channelType = resolveChannelType(channel)
 
     const event = {
-      event_category: body.event_category || 'unknown',
+      event_category: normalized || body.event_category || 'unknown',
       platform: body.platform || 'web',
 
       device_type: body.device_type || null,
