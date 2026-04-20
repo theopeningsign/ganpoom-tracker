@@ -11,7 +11,6 @@ const ALLOWED_EVENTS = new Set([
   'simple.request',
   'order.complete',
   'airbridge.user.signup',
-  'airbridge.user.signin',
   'airbridge.ecommerce.order.completed',
   'airbridge.ecommerce.product.addedToCart',
   'comparison.contract',

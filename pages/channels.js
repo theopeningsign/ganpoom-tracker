@@ -102,6 +102,7 @@ export default function ChannelsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [selectedEvent, setSelectedEvent] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailTab, setDetailTab] = useState('events') // 'events' | 'campaigns' | 'trend'
 
@@ -365,11 +366,17 @@ export default function ChannelsPage() {
                             const dt = new Date(ev.created_at)
                             const dateStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
                             return (
-                              <div key={ev.id || i} style={{
+                              <div key={ev.id || i}
+                                onClick={() => setSelectedEvent(ev)}
+                                style={{
                                 padding: '10px 0',
                                 borderBottom: '1px solid #f0f0f0',
-                                display: 'flex', flexDirection: 'column', gap: 4
-                              }}>
+                                display: 'flex', flexDirection: 'column', gap: 4,
+                                cursor: 'pointer', borderRadius: 6,
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                              >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{
                                     fontSize: 12, fontWeight: 600,
@@ -471,6 +478,60 @@ export default function ChannelsPage() {
           )}
         </div>
       </div>
+
+      {/* 이벤트 상세 모달 */}
+      {selectedEvent && (
+        <div onClick={() => setSelectedEvent(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'white', borderRadius: 16, padding: 32,
+            width: 480, maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>이벤트 상세</h3>
+              <button onClick={() => setSelectedEvent(null)} style={{
+                border: 'none', background: '#f0f0f0', borderRadius: 6,
+                padding: '4px 10px', cursor: 'pointer', fontSize: 13
+              }}>✕ 닫기</button>
+            </div>
+
+            {[
+              ['이벤트', EVENT_LABELS[selectedEvent.event_category] || selectedEvent.event_category],
+              ['발생 시각', selectedEvent.created_at ? new Date(selectedEvent.created_at).toLocaleString('ko-KR') : '-'],
+              ['채널', CHANNEL_LABELS[selectedEvent.channel] || selectedEvent.channel || '-'],
+              ['캠페인', selectedEvent.campaign || '-'],
+              ['광고그룹', selectedEvent.ad_group || '-'],
+              ['플랫폼', selectedEvent.platform || '-'],
+              ['기기', selectedEvent.device_type || '-'],
+              ['OS', selectedEvent.os_name || '-'],
+              ['지역', selectedEvent.client_ip_city ? `${selectedEvent.client_ip_city} ${selectedEvent.client_ip_subdivision || ''}` : '-'],
+              ['IP', selectedEvent.client_ip || '-'],
+              ['UTM Source', selectedEvent.utm_source || '-'],
+              ['UTM Medium', selectedEvent.utm_medium || '-'],
+              ['UTM Campaign', selectedEvent.utm_campaign || '-'],
+              ['Naver 캠페인', selectedEvent.k_campaign || '-'],
+              ['Naver 광고그룹', selectedEvent.k_adgroup || '-'],
+              ['Naver 키워드', selectedEvent.k_keyword || '-'],
+              ['Google GCLID', selectedEvent.gclid || '-'],
+              ['에이전트 ID', selectedEvent.agent_id || '-'],
+              ['랜딩 페이지', selectedEvent.landing_page || '-'],
+              ['유입 경로', selectedEvent.referrer || '-'],
+              ['세션 ID', selectedEvent.session_id || '-'],
+            ].map(([label, value]) => (
+              <div key={label} style={{
+                display: 'flex', borderBottom: '1px solid #f5f5f5', padding: '8px 0', gap: 12
+              }}>
+                <div style={{ fontSize: 12, color: '#888', minWidth: 110, flexShrink: 0 }}>{label}</div>
+                <div style={{ fontSize: 13, color: '#333', wordBreak: 'break-all' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </PasswordProtection>
   )
 }
