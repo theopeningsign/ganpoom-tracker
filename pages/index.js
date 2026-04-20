@@ -301,10 +301,11 @@ export default function Dashboard() {
           ) : (
             <>
               {/* 요약 카드 */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 28 }}>
                 <StatCard label="전체 전환" value={data.summary.total} color="#4facfe" />
                 <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" />
-                <StatCard label="자연유입 / 블로그" value={data.summary.organic} sub="Organic" color="#27ae60" />
+                <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" />
+                <StatCard label="블로그 / SNS" value={data.summary.blog} sub="Blog" color="#00C73C" />
                 <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" />
               </div>
 

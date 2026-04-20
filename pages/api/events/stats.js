@@ -84,8 +84,8 @@ export default async function handler(req, res) {
   })
   const dailyStats = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date))
 
-  // Organic vs Paid vs CPA
-  const typeMap = { paid: 0, organic: 0, cpa: 0 }
+  // Organic vs Paid vs CPA vs Blog
+  const typeMap = { paid: 0, organic: 0, cpa: 0, blog: 0 }
   events.forEach(e => {
     const t = e.channel_type || 'organic'
     typeMap[t] = (typeMap[t] || 0) + 1
@@ -97,6 +97,7 @@ export default async function handler(req, res) {
       total,
       paid: typeMap.paid,
       organic: typeMap.organic,
+      blog: typeMap.blog,
       cpa: typeMap.cpa,
     },
     channelStats,

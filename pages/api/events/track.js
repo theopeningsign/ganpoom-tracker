@@ -62,8 +62,10 @@ function resolveChannelType(channel) {
   if (!channel) return 'organic'
   const paid = ['naver.searchad', 'google', 'tenping_web', 'naver_gfa']
   const cpa = ['agency']
+  const blog = ['naver_blog_official', 'instagram_official']
   if (paid.includes(channel)) return 'paid'
   if (cpa.includes(channel)) return 'cpa'
+  if (blog.includes(channel)) return 'blog'
   return 'organic'
 }
 
