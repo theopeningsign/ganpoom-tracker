@@ -139,6 +139,7 @@ export default function Dashboard() {
   const [dates, setDates] = useState(getDefaultDates)
   const [activePreset, setActivePreset] = useState('today')
   const [platform, setPlatform] = useState('all')
+  const [showStaging, setShowStaging] = useState(false)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -146,13 +147,13 @@ export default function Dashboard() {
   const fetchStats = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/stats?${params}`)
       const json = await res.json()
       if (json.success) setData(json)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
-  }, [dates, platform])
+  }, [dates, platform, showStaging])
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
@@ -232,6 +233,17 @@ export default function Dashboard() {
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 전환 현황</p>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* 스테이징 토글 */}
+              <button onClick={() => setShowStaging(s => !s)} style={{
+                padding: '6px 14px', borderRadius: 8, border: '1px solid',
+                borderColor: showStaging ? '#f39c12' : '#ddd',
+                background: showStaging ? '#fff8e1' : 'white',
+                color: showStaging ? '#f39c12' : '#aaa',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer'
+              }}>
+                {showStaging ? '🧪 스테이징 데이터' : '🧪 스테이징'}
+              </button>
+
               {/* 플랫폼 */}
               <select value={platform} onChange={e => setPlatform(e.target.value)}
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, background: 'white' }}>

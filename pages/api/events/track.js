@@ -142,6 +142,12 @@ export default async function handler(req, res) {
       client_ip_subdivision: body.client_ip_subdivision || ipLocation.client_ip_subdivision || null,
 
       session_id: body.session_id || null,
+
+      // 스테이징 여부: landing_page 또는 referrer에 staging 포함되면 true
+      is_staging: !!(
+        (body.landing_page && body.landing_page.includes('staging')) ||
+        (body.referrer && body.referrer.includes('staging'))
+      ),
     }
 
     const { error } = await supabase.from('events').insert(event)

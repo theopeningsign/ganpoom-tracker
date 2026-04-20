@@ -8,7 +8,7 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { startDate, endDate, platform } = req.query
+  const { startDate, endDate, platform, staging } = req.query
 
   const start = startDate ? new Date(startDate) : (() => {
     const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d
@@ -22,6 +22,13 @@ export default async function handler(req, res) {
     .lte('created_at', end.toISOString())
 
   if (platform && platform !== 'all') query = query.eq('platform', platform)
+
+  // 기본값: 스테이징 데이터 제외 (staging=true 파라미터 있을 때만 포함)
+  if (staging === 'true') {
+    query = query.eq('is_staging', true)
+  } else {
+    query = query.eq('is_staging', false)
+  }
 
   const { data: events, error } = await query
 
