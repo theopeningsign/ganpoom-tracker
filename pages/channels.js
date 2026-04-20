@@ -100,6 +100,7 @@ export default function ChannelsPage() {
   const [platform, setPlatform] = useState('all')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showStaging, setShowStaging] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [detail, setDetail] = useState(null)
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -109,7 +110,7 @@ export default function ChannelsPage() {
   const fetchStats = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/stats?${params}`)
       const json = await res.json()
       if (json.success) setData(json)
@@ -118,7 +119,7 @@ export default function ChannelsPage() {
     } finally {
       setLoading(false)
     }
-  }, [dates, platform])
+  }, [dates, platform, showStaging])
 
   const fetchDetail = useCallback(async (channel) => {
     setDetailLoading(true)
@@ -193,6 +194,17 @@ export default function ChannelsPage() {
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널을 클릭하면 상세 내용을 볼 수 있습니다</p>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* 스테이징 토글 */}
+              <button onClick={() => setShowStaging(s => !s)} style={{
+                padding: '6px 14px', borderRadius: 8, border: '1px solid',
+                borderColor: showStaging ? '#f39c12' : '#ddd',
+                background: showStaging ? '#fff8e1' : 'white',
+                color: showStaging ? '#f39c12' : '#aaa',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer'
+              }}>
+                {showStaging ? '🧪 스테이징 데이터' : '🧪 스테이징'}
+              </button>
+
               <select value={platform} onChange={e => setPlatform(e.target.value)}
                 style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, background: 'white' }}>
                 <option value="all">웹 + 앱</option>
