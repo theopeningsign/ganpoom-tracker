@@ -40,6 +40,7 @@ function normalizeEvent(eventCategory) {
   return eventCategory
     .replace(/^ganpoomclient\./, '')
     .replace(/^ganpoom\./, '')
+    .replace(/^test\./, '')  // 스테이징 환경 test. 접두사 제거
 }
 
 // IP → 도시/지역 (무료 API, rate limit 있음)
