@@ -42,16 +42,16 @@ function normalizeEvent(eventCategory) {
     .replace(/^test\./, '')  // 스테이징 환경 test. 접두사 제거
 }
 
-// IP → 도시/지역 (무료 API, rate limit 있음)
+// IP → 도시/지역 (ip-api.com: 무료, 한국 정확도 좋음, rate limit 없음)
 async function getIpLocation(ip) {
-  if (!ip || ip === '::1' || ip.startsWith('127.') || ip.startsWith('192.168.')) return {}
+  if (!ip || ip === '::1' || ip.startsWith('127.') || ip.startsWith('192.168.') || ip.startsWith('10.')) return {}
   try {
-    const res = await fetch(`https://ipapi.co/${ip}/json/`, { signal: AbortSignal.timeout(2000) })
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=city,regionName&lang=ko`, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return {}
     const data = await res.json()
     return {
       client_ip_city: data.city || null,
-      client_ip_subdivision: data.region || null,
+      client_ip_subdivision: data.regionName || null,
     }
   } catch (_) { return {} }
 }
