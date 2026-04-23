@@ -39,7 +39,7 @@ const CATEGORY_LABELS = {
   'home.screen': '홈화면 조회',
   'airbridge.user.signup': '회원가입',
   'airbridge.user.signin': '로그인',
-  'airbridge.ecommerce.order.completed': '주문완료',
+  'airbridge.ecommerce.order.completed': '스타일시공 요청',
 }
 
 function toYMD(date) {

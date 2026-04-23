@@ -85,7 +85,7 @@ const EVENT_LABELS = {
   'order.complete': '주문 완료',
   'airbridge.user.signup': '회원가입',
   'airbridge.user.signin': '로그인',
-  'airbridge.ecommerce.order.completed': '이커머스 주문',
+  'airbridge.ecommerce.order.completed': '스타일시공 요청',
   'airbridge.ecommerce.product.addedToCart': '장바구니 추가',
   'comparison.contract': '계약',
   'comparison.consult': '상담 요청',
