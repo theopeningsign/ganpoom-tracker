@@ -61,6 +61,7 @@
         k_creative: p.get('k_creative'),
         k_keyword: p.get('k_keyword'),
         k_keyword_id: p.get('k_keyword_id'),
+        k_media: p.get('k_media'),       // 네이버 sub_id_1
         gclid: p.get('gclid'),
         ref: p.get('ref'),
       };
@@ -142,6 +143,7 @@
           k_creative: attr.k_creative || null,
           k_keyword: attr.k_keyword || null,
           k_keyword_id: attr.k_keyword_id || null,
+          k_media: attr.k_media || null,
           gclid: attr.gclid || null,
           agent_id: attr.ref || null,
           referrer: attr.referrer || document.referrer || null,

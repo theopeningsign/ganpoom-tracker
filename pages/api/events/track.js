@@ -130,6 +130,7 @@ export default async function handler(req, res) {
       k_creative: body.k_creative || null,
       k_keyword: body.k_keyword || null,
       k_keyword_id: body.k_keyword_id || null,
+      k_media: body.k_media || null,
 
       gclid: body.gclid || null,
 
