@@ -32,6 +32,27 @@ const TYPE_BADGE = {
   cpa: { label: 'CPA', bg: '#f8d7da', color: '#721c24' },
 }
 
+// 엑셀 내보내기용 Event Category 표기 (Airbridge 형식)
+const CATEGORY_EXPORT_LABELS = {
+  'comparison.request': 'ganpoomclient.comparison.request',
+  'simple.request': 'ganpoomclient.simple.request',
+  'airbridge.ecommerce.order.completed': 'Order Complete',
+  'airbridge.user.signup': 'airbridge.user.signup',
+  'airbridge.user.signin': 'airbridge.user.signin',
+  'order.complete': 'Order Complete',
+  'comparison.contract': 'ganpoomclient.comparison.contract',
+  'comparison.consult': 'ganpoomclient.comparison.consult',
+  'consult.chat': 'ganpoomclient.consult.chat',
+  'phone.click': 'ganpoomclient.phone.click',
+  'event.conversion': 'ganpoomclient.event.conversion',
+}
+
+function formatEventCategory(eventCategory, platform) {
+  const label = CATEGORY_EXPORT_LABELS[eventCategory] || eventCategory
+  const suffix = platform === 'app' ? '(App)' : '(Web)'
+  return `${label} ${suffix}`
+}
+
 const CATEGORY_LABELS = {
   'comparison.request': '비교견적 요청',
   'order.complete': '주문 완료',
@@ -191,31 +212,18 @@ export default function Dashboard() {
       const json = await res.json()
       if (!json.success) return
       const rows = json.events.map(e => ({
-        'Event Category': e.event_category || '',
+        'Event Category': formatEventCategory(e.event_category, e.platform),
         'Event Datetime': e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
         'Channel': e.channel || 'unattributed',
-        'Campaign': e.campaign || '',
-        'Ad Group': e.ad_group || '',
-        'Ad Creative': e.ad_creative || '',
-        'Browser Referrer': e.referrer || '',
-        'Device Type': e.device_type || '',
-        'OS Name': e.os_name || '',
+        'Campaign': e.campaign || e.utm_campaign || '',
+        'Platform': e.os_name || (e.device_type === 'mobile' ? 'Mobile' : 'Desktop'),
         'Client IP City': e.client_ip_city || '',
-        'Client IP Subdivision': e.client_ip_subdivision || '',
-        'Platform': e.platform || 'web',
-        'UTM Source': e.utm_source || '',
-        'UTM Medium': e.utm_medium || '',
-        'UTM Campaign': e.utm_campaign || '',
-        'k_campaign': e.k_campaign || '',
-        'k_adgroup': e.k_adgroup || '',
-        'k_keyword': e.k_keyword || '',
-        'gclid': e.gclid || '',
       }))
       const ws = XLSX.utils.json_to_sheet(rows)
-      ws['!cols'] = [30,22,20,35,15,15,40,12,12,18,22,8,18,14,30,30,20,20,25].map(w => ({ wch: w }))
+      ws['!cols'] = [42, 22, 20, 30, 14, 20].map(w => ({ wch: w }))
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Events')
-      XLSX.writeFile(wb, `ganpoom_${dates.startDate}_${dates.endDate}.xlsx`)
+      XLSX.utils.book_append_sheet(wb, ws, '성과분석')
+      XLSX.writeFile(wb, `간품_성과분석_${dates.startDate}_${dates.endDate}.xlsx`)
     } catch (e) { console.error(e) }
     finally { setExporting(false) }
   }, [dates, platform])
