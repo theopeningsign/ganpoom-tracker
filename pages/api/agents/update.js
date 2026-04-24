@@ -20,9 +20,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: '전화번호는 필수입니다' })
     }
 
-    if (!account && !account_number) {
-      return res.status(400).json({ error: '계좌번호는 필수입니다' })
-    }
+    // 계좌번호는 선택사항
 
     // 에이전트 존재 여부 확인
     const { data: agent, error: findError } = await supabaseAdmin
@@ -50,7 +48,6 @@ export default async function handler(req, res) {
       email: trimmedEmail,
       account_number: (account || account_number)?.trim() || null,
       memo: memo && memo.trim() ? memo.trim() : null,
-      updated_at: new Date().toISOString()
     }
 
     // 에이전트 정보 업데이트

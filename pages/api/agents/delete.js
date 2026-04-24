@@ -26,9 +26,8 @@ export default async function handler(req, res) {
     // 소프트 삭제 (is_active를 false로 변경)
     const { data, error: deleteError } = await supabaseAdmin
       .from('agents')
-      .update({ 
+      .update({
         is_active: false,
-        updated_at: new Date().toISOString()
       })
       .eq('id', agentId)
       .select()

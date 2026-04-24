@@ -170,6 +170,26 @@
       }
     }
 
+    function trackClick(attr) {
+      if (!attr.ref) return; // ref 있는 에이전트 링크만 클릭 추적
+      try {
+        const device = getDeviceInfo();
+        fetch(CONFIG.apiEndpoint + '/track/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentId: attr.ref,
+            sessionId: getSessionId(),
+            referrer: attr.referrer || document.referrer || null,
+            referrerDomain: parseDomain(attr.referrer || document.referrer),
+            landingPage: attr.landing_page || window.location.href,
+            ...device,
+          }),
+          keepalive: true,
+        }).catch(e => log('click track error', e));
+      } catch (e) { log('click track error', e); }
+    }
+
     function initAttribution() {
       const params = getParams();
       const hasAttr = params.utm_source || params.gclid || params.k_campaign || params.ref;
@@ -183,6 +203,7 @@
         };
         Cookie.set(CONFIG.attrKey, JSON.stringify(attr), CONFIG.attrExpiry);
         log('attribution saved', attr);
+        trackClick(attr); // 에이전트 링크 클릭 추적
       }
     }
 

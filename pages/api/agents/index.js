@@ -15,6 +15,8 @@ export default async function handler(req, res) {
       })
     }
 
+    const { startDate, endDate } = req.query
+
     // Supabase에서 활성 에이전트 목록 조회
     // account_number 컬럼이 없을 수 있으므로 모든 컬럼 조회
     const { data: agents, error } = await supabaseAdmin
@@ -45,38 +47,68 @@ export default async function handler(req, res) {
       })
     }
 
+    // 견적요청으로 집계할 이벤트 목록
+    const QUOTE_EVENTS = [
+      'comparison.request',
+      'airbridge.ecommerce.order.completed',
+      'simple.request',
+    ]
+
     // 각 에이전트별 통계 정보 추가 (병렬 최적화)
     const agentsWithStats = await Promise.all(
       agents.map(async (agent) => {
-        // 모든 통계 쿼리를 병렬로 실행
+        // 클릭수 쿼리 (link_clicks 테이블)
+        let clickQuery = supabaseAdmin
+          .from('link_clicks')
+          .select('*', { count: 'exact', head: true })
+          .eq('agent_id', agent.id)
+
+        // 견적요청 쿼리 (events 테이블 기반)
+        let quoteQuery = supabaseAdmin
+          .from('events')
+          .select('*', { count: 'exact', head: true })
+          .eq('agent_id', agent.id)
+          .in('event_category', QUOTE_EVENTS)
+
+        // 커미션 쿼리 (기존 quote_requests 유지)
+        let commissionQuery = supabaseAdmin
+          .from('quote_requests')
+          .select('commission_amount')
+          .eq('agent_id', agent.id)
+          .not('commission_amount', 'is', null)
+
+        // 날짜 필터 적용
+        if (startDate) {
+          clickQuery = clickQuery.gte('created_at', startDate)
+          quoteQuery = quoteQuery.gte('created_at', startDate)
+        }
+        if (endDate) {
+          const endDateTime = endDate + 'T23:59:59.999Z'
+          clickQuery = clickQuery.lte('created_at', endDateTime)
+          quoteQuery = quoteQuery.lte('created_at', endDateTime)
+        }
+
         const [clickResult, quoteResult, commissionResult] = await Promise.all([
-          supabaseAdmin
-            .from('link_clicks')
-            .select('*', { count: 'exact' })
-            .eq('agent_id', agent.id),
-          supabaseAdmin
-            .from('quote_requests')
-            .select('*', { count: 'exact' })
-            .eq('agent_id', agent.id),
-          supabaseAdmin
-            .from('quote_requests')
-            .select('commission_amount')
-            .eq('agent_id', agent.id)
-            .not('commission_amount', 'is', null)
+          clickQuery,
+          quoteQuery,
+          commissionQuery
         ])
 
         const clickCount = clickResult.count || 0
         const quoteCount = quoteResult.count || 0
-        const totalCommission = commissionResult.data?.reduce((sum, item) => 
+        const totalCommission = commissionResult.data?.reduce((sum, item) =>
           sum + (item.commission_amount || 0), 0
         ) || 0
 
         // 전환율 계산
-        const conversionRate = clickCount > 0 ? 
+        const conversionRate = clickCount > 0 ?
           ((quoteCount / clickCount) * 100).toFixed(1) : '0.0'
 
-        // 추적 링크 생성
-        const trackingLink = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.ganpoom.com'}?ref=${agent.id}`
+        // 추적 링크 생성 (gp 에이전트는 ai.ganpoom.com 링크로)
+        const isGpAgent = /^gp\d+$/.test(agent.id)
+        const trackingLink = isGpAgent
+          ? `https://ai.ganpoom.com/${agent.id}`
+          : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.ganpoom.com'}?ref=${agent.id}`
 
         return {
           ...agent,
