@@ -211,26 +211,26 @@ export default function Dashboard() {
       const res = await fetch(`/api/events/export?${params}`)
       const json = await res.json()
       if (!json.success) return
-      const rows = json.events.map(e => {
-        // ISO 8601 KST (+09:00) 형식으로 변환
+      const CPA_HEADERS = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Ad Group', 'Ad Creative', 'Browser Referrer', 'Device Type', 'OS Name', 'Client IP', 'Client IP City', 'Client IP Subdivision']
+      const cpaRows = json.events.map(e => {
         const dt = e.created_at ? new Date(new Date(e.created_at).getTime() + 9 * 60 * 60 * 1000)
           .toISOString().replace('Z', '+09:00') : ''
-        return {
-          'Event Category': formatEventCategory(e.event_category, e.platform),
-          'Event Datetime': dt,
-          'Channel': e.channel || 'unattributed',
-          'Campaign': e.campaign || e.utm_campaign || '',
-          'Ad Group': e.ad_group || '',
-          'Ad Creative': e.ad_creative || '',
-          'Browser Referrer': e.referrer || '',
-          'Device Type': e.device_type || '',
-          'OS Name': e.os_name || '',
-          'Client IP': e.client_ip || '',
-          'Client IP City': e.client_ip_city || '',
-          'Client IP Subdivision': e.client_ip_subdivision || '',
-        }
+        return [
+          formatEventCategory(e.event_category, e.platform),
+          dt,
+          e.channel || 'unattributed',
+          e.campaign || e.utm_campaign || '',
+          e.ad_group || '',
+          e.ad_creative || '',
+          e.referrer || '',
+          e.device_type || '',
+          e.os_name || '',
+          e.client_ip || '',
+          e.client_ip_city || '',
+          e.client_ip_subdivision || '',
+        ]
       })
-      const ws = XLSX.utils.json_to_sheet(rows)
+      const ws = XLSX.utils.aoa_to_sheet([CPA_HEADERS, ...cpaRows])
       ws['!cols'] = [42, 28, 20, 20, 12, 12, 60, 12, 14, 18, 20, 22].map(w => ({ wch: w }))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'CPA 추적')
@@ -246,15 +246,16 @@ export default function Dashboard() {
       const res = await fetch(`/api/events/export?${params}`)
       const json = await res.json()
       if (!json.success) return
-      const rows = json.events.map(e => ({
-        'Event Category': formatEventCategory(e.event_category, e.platform),
-        'Event Datetime': e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
-        'Channel': e.channel || 'unattributed',
-        'Campaign': e.campaign || e.utm_campaign || '',
-        'Platform': e.os_name || (e.device_type === 'mobile' ? 'Mobile' : 'Desktop'),
-        'Client IP City': e.client_ip_city || '',
-      }))
-      const ws = XLSX.utils.json_to_sheet(rows)
+      const PERF_HEADERS = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Platform', 'Client IP City']
+      const perfRows = json.events.map(e => ([
+        formatEventCategory(e.event_category, e.platform),
+        e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
+        e.channel || 'unattributed',
+        e.campaign || e.utm_campaign || '',
+        e.os_name || (e.device_type === 'mobile' ? 'Mobile' : 'Desktop'),
+        e.client_ip_city || '',
+      ]))
+      const ws = XLSX.utils.aoa_to_sheet([PERF_HEADERS, ...perfRows])
       ws['!cols'] = [42, 22, 20, 30, 14, 20].map(w => ({ wch: w }))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, '성과분석')
