@@ -1,171 +1,177 @@
 import { supabaseAdmin } from '../../../lib/supabase'
 
+const QUOTE_EVENTS = [
+  'comparison.request',
+  'airbridge.ecommerce.order.completed',
+  'simple.request',
+]
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
-    // 전체 통계 조회
-    const [agentsResult, clicksResult, quotesResult] = await Promise.all([
-      // 활성 에이전트 수
-      supabaseAdmin
-        .from('agents')
-        .select('*', { count: 'exact' })
-        .eq('is_active', true),
-      
-      // 전체 클릭 수 - 활성 에이전트만
-      supabaseAdmin
-        .from('link_clicks')
-        .select('agent_id, agents!inner(is_active)', { count: 'exact' })
-        .eq('agents.is_active', true),
-      
-      // 전체 견적요청 수 - 활성 에이전트만
-      supabaseAdmin
-        .from('quote_requests')
-        .select('agent_id, agents!inner(is_active)', { count: 'exact' })
-        .eq('agents.is_active', true)
-    ])
-
-    const totalAgents = agentsResult.count || 0
-    const totalClicks = clicksResult.count || 0
-    const totalQuotes = quotesResult.count || 0
-    const conversionRate = totalClicks > 0 ? ((totalQuotes / totalClicks) * 100).toFixed(1) : '0.0'
-
-    // 최근 견적요청, 상위 에이전트, 월별 통계를 병렬로 조회
+    // 오늘 날짜 범위
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
     const todayEnd = new Date()
     todayEnd.setHours(23, 59, 59, 999)
-    const startISO = todayStart.toISOString()
-    const endISO = todayEnd.toISOString()
 
-    const [recentQuotesResult, topAgentsResult, monthlyQueries, todayQuotesResult] = await Promise.all([
-      // 최근 견적요청 목록 (최대 10개) - 활성 에이전트만
-      supabaseAdmin
-        .from('quote_requests')
-        .select(`
-          id,
-          customer_name,
-          customer_phone,
-          service_type,
-          estimated_value,
-          created_at,
-          agents!inner(name, is_active)
-        `)
-        .eq('agents.is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(10),
-      
-      // 상위 에이전트 목록 (최대 5명)
+    // 최근 6개월 시작
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    sixMonthsAgo.setDate(1)
+    sixMonthsAgo.setHours(0, 0, 0, 0)
+
+    // 전체 통계 + 이벤트 데이터 병렬 조회
+    const [
+      agentsResult,
+      clicksResult,
+      totalQuotesResult,
+      recentEventsResult,
+      allQuoteEventsResult,
+      todayEventsResult,
+    ] = await Promise.all([
+      // 활성 에이전트 수
       supabaseAdmin
         .from('agents')
-        .select('id, name')
-        .eq('is_active', true)
-        .limit(5),
-      
-      // 월별 통계 쿼리 준비 (최근 6개월)
-      (() => {
-        const now = new Date()
-        const queries = []
-        const dates = []
-        
-        for (let i = 5; i >= 0; i--) {
-          const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-          const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-          
-          dates.push({
-            month: `${monthDate.getFullYear()}-${(monthDate.getMonth() + 1).toString().padStart(2, '0')}`
-          })
-          
-          queries.push(
-            supabaseAdmin
-              .from('quote_requests')
-              .select('commission_amount, agents!inner(is_active)')
-              .eq('agents.is_active', true)
-              .gte('created_at', monthDate.toISOString())
-              .lt('created_at', nextMonth.toISOString())
-          )
-        }
-        
-        return { queries, dates }
-      })(),
+        .select('id, name', { count: 'exact' })
+        .eq('is_active', true),
+
+      // 전체 클릭 수 (link_clicks)
       supabaseAdmin
-        .from('quote_requests')
-        .select('agent_id, agents!inner(name, is_active)')
-        .eq('agents.is_active', true)
-        .gte('created_at', startISO)
-        .lte('created_at', endISO)
+        .from('link_clicks')
+        .select('agent_id, agents!inner(is_active)', { count: 'exact' })
+        .eq('agents.is_active', true),
+
+      // 전체 견적요청 수 (events 테이블, 에이전트 유입 기준)
+      supabaseAdmin
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .in('event_category', QUOTE_EVENTS)
+        .not('agent_id', 'is', null),
+
+      // 최근 견적요청 10개 (events 테이블)
+      supabaseAdmin
+        .from('events')
+        .select('id, agent_id, event_category, channel, landing_page, created_at, device_type, os_name')
+        .in('event_category', QUOTE_EVENTS)
+        .not('agent_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10),
+
+      // 최근 6개월 견적 이벤트 전체 (월별 통계 + 상위 에이전트용)
+      supabaseAdmin
+        .from('events')
+        .select('agent_id, event_category, created_at')
+        .in('event_category', QUOTE_EVENTS)
+        .not('agent_id', 'is', null)
+        .gte('created_at', sixMonthsAgo.toISOString()),
+
+      // 오늘 견적 이벤트
+      supabaseAdmin
+        .from('events')
+        .select('agent_id, event_category, created_at')
+        .in('event_category', QUOTE_EVENTS)
+        .not('agent_id', 'is', null)
+        .gte('created_at', todayStart.toISOString())
+        .lte('created_at', todayEnd.toISOString()),
     ])
 
-    // 월별 통계 결과 조회 (병렬) - 에러 발생 시 기본값 사용
-    const monthlyResults = await Promise.allSettled(monthlyQueries.queries)
-    const monthlyStats = monthlyResults.map((result, index) => {
-      if (result.status === 'fulfilled' && result.value.data) {
-        const quotes = result.value.data.length || 0
-        const commission = result.value.data.reduce((sum, item) => 
-          sum + (item.commission_amount || 10000), 0
-        ) || 0
+    const totalAgents = agentsResult.count || 0
+    const totalClicks = clicksResult.count || 0
+    const totalQuotes = totalQuotesResult.count || 0
+    const conversionRate = totalClicks > 0 ? ((totalQuotes / totalClicks) * 100).toFixed(1) : '0.0'
 
-        return {
-          month: monthlyQueries.dates[index].month,
-          quotes,
-          commission
-        }
-      } else {
-        // 에러 발생 시 기본값
-        console.error(`월별 통계 조회 오류 (${monthlyQueries.dates[index].month}):`, result.reason)
-        return {
-          month: monthlyQueries.dates[index].month,
-          quotes: 0,
-          commission: 0
-        }
-      }
+    const allQuoteEvents = allQuoteEventsResult.data || []
+
+    // 월별 통계 계산 (JavaScript에서 집계)
+    const now = new Date()
+    const monthlyStats = []
+    for (let i = 5; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
+      const monthKey = `${monthDate.getFullYear()}-${(monthDate.getMonth() + 1).toString().padStart(2, '0')}`
+
+      const monthEvents = allQuoteEvents.filter(e => {
+        const d = new Date(e.created_at)
+        return d >= monthDate && d < nextMonth
+      })
+
+      monthlyStats.push({
+        month: monthKey,
+        quotes: monthEvents.length,
+        commission: monthEvents.length * 10000, // 건당 기본 커미션 (추후 실제값으로 대체)
+      })
+    }
+
+    // 상위 에이전트 계산 (JavaScript에서 agent_id별 집계)
+    const agentQuoteMap = {}
+    allQuoteEvents.forEach(e => {
+      if (!e.agent_id) return
+      agentQuoteMap[e.agent_id] = (agentQuoteMap[e.agent_id] || 0) + 1
     })
 
-    // 상위 에이전트 통계 계산 (병렬)
-    const agents = topAgentsResult.data || []
+    // 상위 5명 agent_id 추출
+    const topAgentIds = Object.entries(agentQuoteMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([id]) => id)
+
+    // 상위 에이전트 이름 조회 + 클릭수
     const topAgents = await Promise.all(
-      agents.map(async (agent) => {
-        const [clickCount, quoteCount] = await Promise.all([
-          supabaseAdmin
-            .from('link_clicks')
-            .select('*', { count: 'exact' })
-            .eq('agent_id', agent.id),
-          
-          supabaseAdmin
-            .from('quote_requests')
-            .select('commission_amount')
-            .eq('agent_id', agent.id)
+      topAgentIds.map(async (agentId) => {
+        const [agentResult, clickResult] = await Promise.all([
+          supabaseAdmin.from('agents').select('id, name').eq('id', agentId).single(),
+          supabaseAdmin.from('link_clicks').select('*', { count: 'exact', head: true }).eq('agent_id', agentId),
         ])
-
-        const clicks = clickCount.count || 0
-        const quotes = quoteCount.data?.length || 0
-        const commission = quoteCount.data?.reduce((sum, item) => 
-          sum + (item.commission_amount || 10000), 0
-        ) || 0
-
+        const quotes = agentQuoteMap[agentId] || 0
+        const clicks = clickResult.count || 0
         return {
-          ...agent,
-          clicks,
+          id: agentId,
+          name: agentResult.data?.name || agentId,
           quotes,
-          commission,
-          conversionRate: clicks > 0 ? ((quotes / clicks) * 100).toFixed(1) : '0.0'
+          clicks,
+          commission: quotes * 10000,
+          conversionRate: clicks > 0 ? ((quotes / clicks) * 100).toFixed(1) : '0.0',
         }
       })
     )
 
-    const recentQuotes = recentQuotesResult.data || []
+    // 최근 견적 이벤트에 에이전트 이름 추가
+    const recentEvents = recentEventsResult.data || []
+    const agentIds = [...new Set(recentEvents.map(e => e.agent_id).filter(Boolean))]
+    let agentNameMap = {}
+    if (agentIds.length > 0) {
+      const { data: agentNames } = await supabaseAdmin
+        .from('agents')
+        .select('id, name')
+        .in('id', agentIds)
+      agentNameMap = Object.fromEntries((agentNames || []).map(a => [a.id, a.name]))
+    }
 
-    const todayQuotes = todayQuotesResult.data || []
+    const recentQuotes = recentEvents.map(e => ({
+      id: e.id,
+      agent_id: e.agent_id,
+      agentName: agentNameMap[e.agent_id] || e.agent_id,
+      event_category: e.event_category,
+      channel: e.channel,
+      device_type: e.device_type,
+      os_name: e.os_name,
+      created_at: e.created_at,
+    }))
+
+    // 오늘 에이전트별 견적 집계
+    const todayEvents = todayEventsResult.data || []
     const todayQuoteMap = {}
-    todayQuotes.forEach((item) => {
-      const agentId = item.agent_id || 'unknown'
+    todayEvents.forEach(e => {
+      const agentId = e.agent_id || 'unknown'
       if (!todayQuoteMap[agentId]) {
         todayQuoteMap[agentId] = {
           agentId,
-          name: item.agents?.name || '알 수 없음',
-          quotes: 0
+          name: agentNameMap[agentId] || agentId,
+          quotes: 0,
         }
       }
       todayQuoteMap[agentId].quotes += 1
@@ -179,19 +185,19 @@ export default async function handler(req, res) {
         totalClicks,
         totalQuotes,
         conversionRate: parseFloat(conversionRate),
-        totalRevenue: monthlyStats.reduce((sum, month) => sum + month.commission, 0)
+        totalRevenue: monthlyStats.reduce((sum, month) => sum + month.commission, 0),
       },
-      recentQuotes: recentQuotes || [],
+      recentQuotes,
       topAgents: topAgents.sort((a, b) => b.quotes - a.quotes),
       monthlyStats,
-      todayQuotes: todayQuoteList
+      todayQuotes: todayQuoteList,
     })
 
   } catch (error) {
     console.error('대시보드 통계 API 오류:', error)
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Server error occurred',
-      details: error.message 
+      details: error.message,
     })
   }
 }

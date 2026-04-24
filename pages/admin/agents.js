@@ -18,12 +18,10 @@ export default function AgentManagement() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('created_at')
-  const [viewMode, setViewMode] = useState('grid')
+  const [viewMode, setViewMode] = useState('list')
   const [formData, setFormData] = useState(initialFormState)
   const [editingAgent, setEditingAgent] = useState(null)
   const [statusMessage, setStatusMessage] = useState({ type: '', text: '' })
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
 
   // 상태 메시지 표시 함수
   const showMessage = (type, text) => {
@@ -156,18 +154,12 @@ export default function AgentManagement() {
     setFilteredAgents(filtered)
   }, [agents, searchTerm, sortBy])
 
-  const loadAgents = async (sd = startDate, ed = endDate) => {
+  const loadAgents = async () => {
     try {
       setLoading(true)
 
-      // 날짜 필터 쿼리 파라미터 구성
-      const params = new URLSearchParams()
-      if (sd) params.append('startDate', sd)
-      if (ed) params.append('endDate', ed)
-      const queryString = params.toString() ? '?' + params.toString() : ''
-
       // 실제 API에서 에이전트 목록 가져오기
-      const response = await fetch('/api/agents' + queryString)
+      const response = await fetch('/api/agents')
       
       if (response.ok) {
         const result = await response.json()
@@ -451,67 +443,6 @@ export default function AgentManagement() {
               alignItems: 'center',
               marginBottom: '30px'
             }}>
-              {/* 기간 필터 */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  style={{
-                    padding: '12px 10px',
-                    border: '2px solid #e1e5e9',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-                <span style={{ color: '#666' }}>~</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  style={{
-                    padding: '12px 10px',
-                    border: '2px solid #e1e5e9',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-                <button
-                  onClick={() => loadAgents(startDate, endDate)}
-                  style={{
-                    padding: '12px 18px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  🔍 조회
-                </button>
-                {(startDate || endDate) && (
-                  <button
-                    onClick={() => { setStartDate(''); setEndDate(''); loadAgents('', '') }}
-                    style={{
-                      padding: '12px 14px',
-                      background: '#f8f9fa',
-                      color: '#666',
-                      border: '2px solid #e1e5e9',
-                      borderRadius: '8px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
-                  >
-                    전체
-                  </button>
-                )}
-              </div>
-
               {/* 검색 */}
               <input
                 type="text"
