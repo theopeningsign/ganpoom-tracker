@@ -37,8 +37,8 @@ const CATEGORY_EXPORT_LABELS = {
   'comparison.request': 'ganpoomclient.comparison.request',
   'simple.request': 'ganpoomclient.simple.request',
   'airbridge.ecommerce.order.completed': 'Order Complete',
-  'airbridge.user.signup': 'airbridge.user.signup',
-  'airbridge.user.signin': 'airbridge.user.signin',
+  'airbridge.user.signup': 'Sign-up',
+  'airbridge.user.signin': 'Sign-in',
   'order.complete': 'Order Complete',
   'comparison.contract': 'ganpoomclient.comparison.contract',
   'comparison.consult': 'ganpoomclient.comparison.consult',
@@ -204,6 +204,41 @@ export default function Dashboard() {
     finally { setExporting(false) }
   }, [dates, platform])
 
+  const exportCPAExcel = useCallback(async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      const res = await fetch(`/api/events/export?${params}`)
+      const json = await res.json()
+      if (!json.success) return
+      const rows = json.events.map(e => {
+        // ISO 8601 KST (+09:00) 형식으로 변환
+        const dt = e.created_at ? new Date(new Date(e.created_at).getTime() + 9 * 60 * 60 * 1000)
+          .toISOString().replace('Z', '+09:00') : ''
+        return {
+          'Event Category': formatEventCategory(e.event_category, e.platform),
+          'Event Datetime': dt,
+          'Channel': e.channel || 'unattributed',
+          'Campaign': e.campaign || e.utm_campaign || '',
+          'Ad Group': e.ad_group || '',
+          'Ad Creative': e.ad_creative || '',
+          'Browser Referrer': e.referrer || '',
+          'Device Type': e.device_type || '',
+          'OS Name': e.os_name || '',
+          'Client IP': e.client_ip || '',
+          'Client IP City': e.client_ip_city || '',
+          'Client IP Subdivision': e.client_ip_subdivision || '',
+        }
+      })
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [42, 28, 20, 20, 12, 12, 60, 12, 14, 18, 20, 22].map(w => ({ wch: w }))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'CPA 추적')
+      XLSX.writeFile(wb, `간품_CPA추적_${dates.startDate}_${dates.endDate}.xlsx`)
+    } catch (e) { console.error(e) }
+    finally { setExporting(false) }
+  }, [dates, platform])
+
   const exportExcel = useCallback(async () => {
     setExporting(true)
     try {
@@ -291,13 +326,13 @@ export default function Dashboard() {
                 style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                 조회
               </button>
-              <button onClick={exportCSV} disabled={exporting}
-                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: 'white', color: '#555', fontSize: 13, cursor: 'pointer' }}>
-                CSV
-              </button>
               <button onClick={exportExcel} disabled={exporting}
                 style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#217346', color: 'white', fontSize: 13, cursor: 'pointer' }}>
-                Excel
+                📊 성과분석
+              </button>
+              <button onClick={exportCPAExcel} disabled={exporting}
+                style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#c55a11', color: 'white', fontSize: 13, cursor: 'pointer' }}>
+                📋 CPA 추적
               </button>
             </div>
           </div>
