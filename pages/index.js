@@ -8,8 +8,15 @@ import PasswordProtection from '../components/PasswordProtection'
 
 const CHANNEL_LABELS = {
   'naver.searchad': '네이버 검색광고',
+  'naver_powercontents': '네이버 파워컨텐츠',
+  'naver_powerlink_sublink': '네이버 서브링크',
+  'naver_gfa': '네이버 GFA',
   'google': '구글 광고',
+  'google.adwords': '구글 앱 프로모션',
   'tenping_web': '텐핑',
+  'tenping': '텐핑 (구)',
+  'facebook.business': '페이스북',
+  'kakao': '카카오 검색광고',
   'agency': 'CPA 에이전시',
   'naver_blog_official': '네이버 블로그',
   'instagram_official': '인스타그램',
@@ -18,8 +25,15 @@ const CHANNEL_LABELS = {
 
 const CHANNEL_COLORS = {
   'naver.searchad': '#03C75A',
+  'naver_powercontents': '#00B050',
+  'naver_powerlink_sublink': '#1DB954',
+  'naver_gfa': '#57C278',
   'google': '#4285F4',
+  'google.adwords': '#34A853',
   'tenping_web': '#FF6B35',
+  'tenping': '#FF8C5A',
+  'facebook.business': '#1877F2',
+  'kakao': '#FEE500',
   'agency': '#9B59B6',
   'naver_blog_official': '#00C73C',
   'instagram_official': '#E1306C',

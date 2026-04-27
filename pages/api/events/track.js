@@ -59,7 +59,18 @@ async function getIpLocation(ip) {
 // 채널 타입 자동 분류
 function resolveChannelType(channel) {
   if (!channel) return 'organic'
-  const paid = ['naver.searchad', 'google', 'tenping_web', 'naver_gfa']
+  const paid = [
+    'naver.searchad',
+    'naver_powercontents',
+    'naver_powerlink_sublink',
+    'google',
+    'google.adwords',
+    'tenping_web',
+    'tenping',
+    'naver_gfa',
+    'facebook.business',
+    'kakao',
+  ]
   const cpa = ['agency']
   const blog = ['naver_blog_official', 'instagram_official']
   if (paid.includes(channel)) return 'paid'
