@@ -17,7 +17,6 @@ export default async function handler(req, res) {
 
     if (!agentId) return res.status(400).json({ error: 'agentId required' })
 
-    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
     const userAgent = req.headers['user-agent'] || null
 
     const { error } = await supabase.from('link_clicks').insert({
@@ -26,7 +25,6 @@ export default async function handler(req, res) {
       referrer: referrer || null,
       referrer_domain: referrerDomain || null,
       landing_page: landingPage || null,
-      ip_address: ip || null,
       user_agent: userAgent,
     })
 
