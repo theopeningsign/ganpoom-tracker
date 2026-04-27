@@ -1,189 +1,43 @@
-import { supabaseAdmin } from '../../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
-// IP 주소 추출 함수
-function getClientIP(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0] || 
-         req.headers['x-real-ip'] || 
-         req.connection.remoteAddress || 
-         req.socket.remoteAddress ||
-         '127.0.0.1'
-}
-
-// User Agent 파싱 함수
-function parseUserAgent(userAgent) {
-  const ua = userAgent || ''
-  
-  // 디바이스 타입 감지
-  let deviceType = 'desktop'
-  if (/Mobile|Android|iPhone|iPad/.test(ua)) {
-    deviceType = /iPad/.test(ua) ? 'tablet' : 'mobile'
-  }
-  
-  // 브라우저 감지
-  let browser = 'Unknown'
-  if (ua.includes('Chrome')) browser = 'Chrome'
-  else if (ua.includes('Firefox')) browser = 'Firefox'
-  else if (ua.includes('Safari')) browser = 'Safari'
-  else if (ua.includes('Edge')) browser = 'Edge'
-  
-  // OS 감지
-  let os = 'Unknown'
-  if (ua.includes('Windows')) os = 'Windows'
-  else if (ua.includes('Mac')) os = 'macOS'
-  else if (ua.includes('Linux')) os = 'Linux'
-  else if (ua.includes('Android')) os = 'Android'
-  else if (ua.includes('iOS')) os = 'iOS'
-  
-  return { deviceType, browser, os }
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.status(200).end()
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const { 
-      agentId, 
-      sessionId, 
-      referrer, 
-      referrerDomain,
-      landingPage 
-    } = req.body
+    const { agentId, sessionId, referrer, referrerDomain, landingPage, device_type, os_name } = req.body
 
-    // 필수 필드 검증
-    if (!agentId) {
-      return res.status(400).json({ error: 'Agent ID is required' })
-    }
+    if (!agentId) return res.status(400).json({ error: 'agentId required' })
 
-    // 에이전트 존재 확인
-    const { data: agent, error: agentError } = await supabaseAdmin
-      .from('agents')
-      .select('id, is_active')
-      .eq('id', agentId)
-      .eq('is_active', true)
-      .single()
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
 
-    if (agentError || !agent) {
-      return res.status(404).json({ error: 'Agent not found or inactive' })
-    }
-
-    // 클라이언트 정보 수집
-    const ipAddress = getClientIP(req)
-    const userAgent = req.headers['user-agent'] || ''
-    const { deviceType, browser, os } = parseUserAgent(userAgent)
-
-    // 링크 클릭 기록
-    const { data: clickData, error: clickError } = await supabaseAdmin
-      .from('link_clicks')
-      .insert([
-        {
-          agent_id: agentId,
-          ip_address: ipAddress,
-          user_agent: userAgent,
-          referrer: referrer || null, // 원본 URL
-          referrer_domain: referrerDomain || null, // 파싱된 도메인만
-          landing_page: landingPage || 'https://www.ganpoom.com',
-          session_id: sessionId
-        }
-      ])
-      .select()
-      .single()
-
-    if (clickError) {
-      console.error('클릭 기록 오류:', clickError)
-      return res.status(500).json({ error: 'Failed to record click' })
-    }
-
-    // 세션 정보 업데이트 또는 생성
-    const { data: existingSession } = await supabaseAdmin
-      .from('user_sessions')
-      .select('id')
-      .eq('id', sessionId)
-      .single()
-
-    if (!existingSession) {
-      // 새 세션 생성
-      await supabaseAdmin
-        .from('user_sessions')
-        .insert([
-          {
-            id: sessionId,
-            agent_id: agentId,
-            first_click_id: clickData.id,
-            ip_address: ipAddress,
-            user_agent: userAgent,
-            device_type: deviceType,
-            browser: browser,
-            os: os,
-            page_views: 1,
-            started_at: new Date().toISOString()
-          }
-        ])
-    } else {
-      // 기존 세션 업데이트 (페이지뷰 증가)
-      const { data: currentSession } = await supabaseAdmin
-        .from('user_sessions')
-        .select('page_views')
-        .eq('id', sessionId)
-        .single()
-      
-      const newPageViews = (currentSession?.page_views || 0) + 1
-      
-      // 세션 업데이트와 페이지뷰 기록을 병렬로 실행
-      await Promise.all([
-        supabaseAdmin
-          .from('user_sessions')
-          .update({ 
-            page_views: newPageViews
-          })
-          .eq('id', sessionId),
-        supabaseAdmin
-          .from('page_views')
-          .insert([
-            {
-              session_id: sessionId,
-              agent_id: agentId,
-              page_url: landingPage || 'https://www.ganpoom.com',
-              page_title: 'Ganpoom - 홈페이지'
-            }
-          ])
-      ])
-
-      res.status(200).json({
-        success: true,
-        clickId: clickData.id,
-        sessionId: sessionId
-      })
-      return
-    }
-
-    // 새 세션 생성 시 페이지뷰 기록 (병렬로 처리할 필요 없음 - 이미 세션 생성 중)
-    await supabaseAdmin
-      .from('page_views')
-      .insert([
-        {
-          session_id: sessionId,
-          agent_id: agentId,
-          page_url: landingPage || 'https://www.ganpoom.com',
-          page_title: 'Ganpoom - 홈페이지'
-        }
-      ])
-
-    res.status(200).json({
-      success: true,
-      clickId: clickData.id,
-      sessionId: sessionId
+    const { error } = await supabase.from('link_clicks').insert({
+      agent_id: agentId,
+      session_id: sessionId || null,
+      referrer: referrer || null,
+      referrer_domain: referrerDomain || null,
+      landing_page: landingPage || null,
+      device_type: device_type || null,
+      os_name: os_name || null,
+      ip_address: ip || null,
     })
 
-  } catch (error) {
-    console.error('클릭 추적 오류:', error)
-    res.status(500).json({ error: 'Server error occurred' })
+    if (error) {
+      console.error('link_clicks insert error:', error)
+      return res.status(500).json({ success: false, error: error.message })
+    }
+
+    return res.status(200).json({ success: true })
+  } catch (err) {
+    console.error('click track error:', err)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 }
-
