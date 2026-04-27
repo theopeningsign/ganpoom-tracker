@@ -50,8 +50,9 @@ export default async function handler(req, res) {
     // 견적요청으로 집계할 이벤트 목록
     const QUOTE_EVENTS = [
       'comparison.request',
-      'airbridge.ecommerce.order.completed',
       'simple.request',
+      'airbridge.ecommerce.order.completed',
+      'order.complete',
     ]
 
     // 각 에이전트별 통계 정보 추가 (병렬 최적화)
