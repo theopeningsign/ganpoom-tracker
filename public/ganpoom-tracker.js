@@ -207,38 +207,10 @@
       }
     }
 
-    // window.airbridge.events.send 가로채기
-    function wrapAirbridge() {
-      if (!window.airbridge || !window.airbridge.events || !window.airbridge.events.send) return false;
-      if (window.airbridge._gpWrapped) return true;
-      const orig = window.airbridge.events.send.bind(window.airbridge.events);
-      window.airbridge.events.send = function(eventCategory, params) {
-        try { orig(eventCategory, params); } catch(e) {}
-        send(eventCategory, params || {});
-        log('airbridge intercepted', eventCategory);
-      };
-      window.airbridge._gpWrapped = true;
-      log('airbridge wrapped');
-      return true;
-    }
-
     function init() {
       initAttribution();
       ready = true;
       flush();
-
-      // 즉시 시도 (이미 로드된 경우)
-      if (!wrapAirbridge()) {
-        // Airbridge가 나중에 로드될 경우 대비해 polling
-        let attempts = 0;
-        const poller = setInterval(function() {
-          attempts++;
-          if (wrapAirbridge() || attempts >= 100) { // 최대 10초 대기
-            clearInterval(poller);
-          }
-        }, 100);
-      }
-
       log('initialized');
     }
 
