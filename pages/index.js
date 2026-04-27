@@ -308,7 +308,7 @@ export default function Dashboard() {
           <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{categoryModal.label}</div>
-              <div style={{ fontSize: 12, color: '#888', marginTop: 3 }}>{dates.startDate} ~ {dates.endDate} · 채널별 분석</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 3 }}>{dates.startDate} ~ {dates.endDate} · 채널별 견적요청 분석</div>
             </div>
             <button onClick={() => setCategoryModal(null)} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: '#aaa', lineHeight: 1 }}>✕</button>
           </div>
@@ -373,7 +373,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>대시보드</h1>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 전환 현황</p>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 견적요청 현황</p>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* 스테이징 토글 */}
@@ -444,18 +444,19 @@ export default function Dashboard() {
           ) : (
             <>
               {/* 요약 카드 */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 28 }}>
-                <StatCard label="전체 전환" value={data.summary.total} color="#4facfe" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16, marginBottom: 28 }}>
+                <StatCard label="전체 견적요청" value={data.summary.total} color="#4facfe" />
                 <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" />
                 <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" />
                 <StatCard label="블로그 / SNS" value={data.summary.blog} sub="Blog" color="#00C73C" />
                 <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" />
+                <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" />
               </div>
 
               {/* 채널 테이블 + 일별 추이 */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
                 <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-                  <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>채널별 전환</div>
+                  <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>채널별 견적요청</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#fafafa' }}>
@@ -492,7 +493,7 @@ export default function Dashboard() {
                 </div>
 
                 <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 20 }}>일별 전환 추이</div>
+                  <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 20 }}>일별 견적요청 추이</div>
                   {data.dailyStats.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 60, color: '#bbb', fontSize: 13 }}>데이터가 없습니다</div>
                   ) : (
@@ -501,7 +502,7 @@ export default function Dashboard() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v.slice(5)} />
                         <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <Tooltip formatter={v => [v + '건', '전환']} />
+                        <Tooltip formatter={v => [v + '건', '견적요청']} />
                         <Line type="monotone" dataKey="total" stroke="#4facfe" strokeWidth={2} dot={{ r: 3 }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -509,10 +510,10 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 전환 유형 + 플랫폼/기기 */}
+              {/* 견적 유형 + 플랫폼/기기 */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-                  <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>전환 유형</div>
+                  <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>견적요청 유형</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#fafafa' }}>

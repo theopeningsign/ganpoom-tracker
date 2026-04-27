@@ -5,6 +5,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// 견적요청으로 집계할 이벤트
+const QUOTE_EVENTS = [
+  'comparison.request',
+  'simple.request',
+  'airbridge.ecommerce.order.completed',
+  'order.complete',
+]
+
+// 회원가입 이벤트
+const SIGNUP_EVENTS = [
+  'airbridge.user.signup',
+]
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -15,43 +28,46 @@ export default async function handler(req, res) {
   })()
   const end = endDate ? new Date(endDate + 'T23:59:59') : new Date()
 
-  let query = supabase
+  let baseQuery = supabase
     .from('events')
     .select('*')
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
 
-  if (platform && platform !== 'all') query = query.eq('platform', platform)
+  if (platform && platform !== 'all') baseQuery = baseQuery.eq('platform', platform)
 
-  // 기본값: 스테이징 데이터 제외 (staging=true 파라미터 있을 때만 포함)
   if (staging === 'true') {
-    query = query.eq('is_staging', true)
+    baseQuery = baseQuery.eq('is_staging', true)
   } else {
-    query = query.eq('is_staging', false)
+    baseQuery = baseQuery.eq('is_staging', false)
   }
 
-  const { data: events, error } = await query
+  const { data: allEvents, error } = await baseQuery
 
   if (error) {
     console.error('stats error:', error)
     return res.status(500).json({ success: false, error: error.message })
   }
 
-  // 전체 요약
+  // 견적요청 이벤트만 필터
+  const events = allEvents.filter(e => QUOTE_EVENTS.includes(e.event_category))
+
+  // 회원가입 건수
+  const signupCount = allEvents.filter(e => SIGNUP_EVENTS.includes(e.event_category)).length
+
+  // 전체 견적요청 수
   const total = events.length
 
-  // 채널별 집계
+  // 채널별 집계 (견적 기준)
   const channelMap = {}
   events.forEach(e => {
     const key = e.channel || 'unattributed'
-    if (!channelMap[key]) channelMap[key] = { channel: key, channel_type: e.channel_type || 'organic', count: 0, categories: {} }
+    if (!channelMap[key]) channelMap[key] = { channel: key, channel_type: e.channel_type || 'organic', count: 0 }
     channelMap[key].count++
-    const cat = e.event_category || 'unknown'
-    channelMap[key].categories[cat] = (channelMap[key].categories[cat] || 0) + 1
   })
   const channelStats = Object.values(channelMap).sort((a, b) => b.count - a.count)
 
-  // 이벤트 카테고리별 집계
+  // 견적 유형별 집계 (견적 이벤트만)
   const categoryMap = {}
   events.forEach(e => {
     const key = e.event_category || 'unknown'
@@ -61,21 +77,21 @@ export default async function handler(req, res) {
     .map(([category, count]) => ({ category, count }))
     .sort((a, b) => b.count - a.count)
 
-  // 플랫폼별 (web/app)
+  // 플랫폼별 (견적 기준)
   const platformMap = {}
   events.forEach(e => {
     const key = e.platform || 'web'
     platformMap[key] = (platformMap[key] || 0) + 1
   })
 
-  // 기기별 (desktop/mobile)
+  // 기기별 (견적 기준)
   const deviceMap = {}
   events.forEach(e => {
     const key = e.device_type || 'unknown'
     deviceMap[key] = (deviceMap[key] || 0) + 1
   })
 
-  // 일별 추이
+  // 일별 추이 (견적 기준)
   const dailyMap = {}
   events.forEach(e => {
     const day = e.created_at.slice(0, 10)
@@ -84,7 +100,7 @@ export default async function handler(req, res) {
   })
   const dailyStats = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date))
 
-  // Organic vs Paid vs CPA vs Blog
+  // 채널 유형별 (paid/organic/cpa/blog) - 견적 기준
   const typeMap = { paid: 0, organic: 0, cpa: 0, blog: 0 }
   events.forEach(e => {
     const t = e.channel_type || 'organic'
@@ -99,6 +115,7 @@ export default async function handler(req, res) {
       organic: typeMap.organic,
       blog: typeMap.blog,
       cpa: typeMap.cpa,
+      signup: signupCount,
     },
     channelStats,
     categoryStats,
