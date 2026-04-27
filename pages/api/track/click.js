@@ -13,18 +13,16 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const { agentId, sessionId, referrer, referrerDomain, landingPage } = req.body
+    const { agentId } = req.body
 
     if (!agentId) return res.status(400).json({ error: 'agentId required' })
 
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
     const userAgent = req.headers['user-agent'] || null
 
     const { error } = await supabase.from('link_clicks').insert({
       agent_id: agentId,
-      session_id: sessionId || null,
-      referrer: referrer || null,
-      referrer_domain: referrerDomain || null,
-      landing_page: landingPage || null,
+      ip: ip || null,
       user_agent: userAgent,
     })
 
