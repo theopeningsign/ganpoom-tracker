@@ -114,15 +114,23 @@ function getDefaultDates() {
   return getDateRange('today')
 }
 
-function StatCard({ label, value, sub, color }) {
+function StatCard({ label, value, sub, color, onClick }) {
   return (
-    <div style={{
-      background: 'white', borderRadius: 12, padding: '20px 24px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderLeft: `4px solid ${color}`,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: 'white', borderRadius: 12, padding: '20px 24px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderLeft: `4px solid ${color}`,
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'box-shadow 0.15s',
+      }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.14)' }}
+      onMouseLeave={e => { if (onClick) e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)' }}
+    >
       <div style={{ fontSize: 13, color: '#888', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 32, fontWeight: 700, color: '#1a1a1a' }}>{value?.toLocaleString() ?? 0}</div>
       {sub && <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>{sub}</div>}
+      {onClick && <div style={{ fontSize: 11, color: color, marginTop: 6, fontWeight: 600 }}>채널별 보기 →</div>}
     </div>
   )
 }
@@ -450,7 +458,7 @@ export default function Dashboard() {
                 <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" />
                 <StatCard label="블로그 / SNS" value={data.summary.blog} sub="Blog" color="#00C73C" />
                 <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" />
-                <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" />
+                <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" onClick={() => openCategoryModal('airbridge.user.signup', '회원가입')} />
               </div>
 
               {/* 채널 테이블 + 일별 추이 */}
