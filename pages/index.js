@@ -178,6 +178,20 @@ export default function Dashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [categoryModal, setCategoryModal] = useState(null) // { category, label, data }
+  const [modalLoading, setModalLoading] = useState(false)
+
+  const openCategoryModal = useCallback(async (category, label) => {
+    setModalLoading(true)
+    setCategoryModal({ category, label, data: null })
+    try {
+      const params = new URLSearchParams({ category, startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
+      const res = await fetch(`/api/events/category-detail?${params}`)
+      const json = await res.json()
+      if (json.success) setCategoryModal({ category, label, data: json })
+    } catch (e) { console.error(e) }
+    finally { setModalLoading(false) }
+  }, [dates, platform, showStaging])
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -279,6 +293,76 @@ export default function Dashboard() {
   }, [dates, platform])
 
   return (
+    {/* 전환 유형 상세 모달 */}
+    {categoryModal && (
+      <div
+        onClick={() => setCategoryModal(null)}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ background: 'white', borderRadius: 16, width: 480, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}
+        >
+          {/* 헤더 */}
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{categoryModal.label}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 3 }}>{dates.startDate} ~ {dates.endDate} · 채널별 분석</div>
+            </div>
+            <button onClick={() => setCategoryModal(null)} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: '#aaa', lineHeight: 1 }}>✕</button>
+          </div>
+
+          {/* 본문 */}
+          <div style={{ overflowY: 'auto', padding: '16px 0' }}>
+            {modalLoading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>불러오는 중...</div>
+            ) : !categoryModal.data ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</div>
+            ) : (
+              <>
+                <div style={{ padding: '0 24px 12px', fontSize: 13, color: '#888' }}>
+                  총 <strong style={{ color: '#1a1a1a' }}>{categoryModal.data.total.toLocaleString()}건</strong>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#fafafa' }}>
+                      {['채널', '구분', '건수', '비율'].map(h => (
+                        <th key={h} style={{ padding: '8px 24px', textAlign: h === '건수' || h === '비율' ? 'right' : h === '구분' ? 'center' : 'left', fontSize: 11, color: '#888', fontWeight: 600 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryModal.data.channelStats.length === 0 ? (
+                      <tr><td colSpan={4} style={{ padding: 32, textAlign: 'center', color: '#bbb', fontSize: 13 }}>채널 데이터가 없습니다</td></tr>
+                    ) : categoryModal.data.channelStats.map(ch => {
+                      const badge = TYPE_BADGE[ch.channel_type] || TYPE_BADGE.organic
+                      const color = CHANNEL_COLORS[ch.channel] || '#bbb'
+                      const pct = categoryModal.data.total > 0 ? ((ch.count / categoryModal.data.total) * 100).toFixed(1) : '0.0'
+                      return (
+                        <tr key={ch.channel} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                          <td style={{ padding: '11px 24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, fontWeight: 500 }}>{CHANNEL_LABELS[ch.channel] || ch.channel}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '11px 24px', textAlign: 'center' }}>
+                            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: badge.bg, color: badge.color, fontWeight: 600 }}>{badge.label}</span>
+                          </td>
+                          <td style={{ padding: '11px 24px', textAlign: 'right', fontWeight: 700, fontSize: 14 }}>{ch.count.toLocaleString()}</td>
+                          <td style={{ padding: '11px 24px', textAlign: 'right', fontSize: 13, color: '#888' }}>{pct}%</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
     <PasswordProtection>
       <div style={{ background: '#f5f6fa', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
         <Sidebar current="/" />
@@ -441,9 +525,17 @@ export default function Dashboard() {
                         <tr><td colSpan={3} style={{ padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>데이터가 없습니다</td></tr>
                       ) : data.categoryStats.map(c => {
                         const pct = data.summary.total > 0 ? ((c.count / data.summary.total) * 100).toFixed(1) : '0.0'
+                        const label = CATEGORY_LABELS[c.category] || c.category
                         return (
-                          <tr key={c.category} style={{ borderBottom: '1px solid #f5f5f5' }}>
-                            <td style={{ padding: '12px 16px', fontSize: 13 }}>{CATEGORY_LABELS[c.category] || c.category}</td>
+                          <tr key={c.category}
+                            onClick={() => openCategoryModal(c.category, label)}
+                            style={{ borderBottom: '1px solid #f5f5f5', cursor: 'pointer' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = ''}
+                          >
+                            <td style={{ padding: '12px 16px', fontSize: 13 }}>
+                              <span style={{ borderBottom: '1px dashed #aaa' }}>{label}</span>
+                            </td>
                             <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{c.count.toLocaleString()}</td>
                             <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#888' }}>{pct}%</td>
                           </tr>
