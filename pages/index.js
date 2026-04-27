@@ -293,6 +293,7 @@ export default function Dashboard() {
   }, [dates, platform])
 
   return (
+    <>
     {/* 전환 유형 상세 모달 */}
     {categoryModal && (
       <div
@@ -578,5 +579,6 @@ export default function Dashboard() {
         </div>
       </div>
     </PasswordProtection>
+    </>
   )
 }
