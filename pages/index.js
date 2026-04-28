@@ -309,17 +309,38 @@ export default function Dashboard() {
     <style>{`
       @media (max-width: 768px) {
         .gp-sidebar { display: none !important; }
-        .gp-main { margin-left: 0 !important; padding: 16px !important; }
+        .gp-mobile-nav { display: flex !important; }
+        .gp-main { margin-left: 0 !important; padding: 12px !important; padding-top: 60px !important; }
         .gp-stat-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
         .gp-two-col { grid-template-columns: 1fr !important; }
         .gp-controls { width: 100%; margin-top: 12px; }
         .gp-controls input[type="date"] { width: 130px; font-size: 12px !important; padding: 6px 8px !important; }
         .gp-modal-box { width: 92% !important; }
+        .gp-header { flex-direction: column !important; align-items: flex-start !important; }
       }
       @media (max-width: 480px) {
         .gp-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
       }
+      .gp-mobile-nav { display: none; }
     `}</style>
+    {/* 모바일 상단 네비바 */}
+    <div className="gp-mobile-nav" style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
+      background: '#1a1d2e', height: 52,
+      alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>📊 대시보드</div>
+      <Link href="/channels" style={{ textDecoration: 'none' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: 'rgba(255,255,255,0.1)', borderRadius: 20,
+          padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
+        }}>
+          <span>📡</span><span>채널분석</span>
+        </div>
+      </Link>
+    </div>
     {/* 전환 유형 상세 모달 */}
     {categoryModal && (
       <div
@@ -397,7 +418,7 @@ export default function Dashboard() {
         <div className="gp-main" style={{ marginLeft: 220, padding: 32 }}>
 
           {/* 헤더 */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+          <div className="gp-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>대시보드</h1>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 견적요청 현황</p>

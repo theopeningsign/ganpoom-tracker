@@ -155,10 +155,45 @@ export default function ChannelsPage() {
 
   return (
     <PasswordProtection>
+      <style>{`
+        @media (max-width: 768px) {
+          .ch-sidebar { display: none !important; }
+          .ch-mobile-nav { display: flex !important; }
+          .ch-main { margin-left: 0 !important; padding: 12px !important; padding-top: 60px !important; }
+          .ch-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .ch-header h1 { font-size: 20px !important; }
+          .ch-controls { width: 100% !important; justify-content: flex-start !important; flex-wrap: wrap !important; }
+          .ch-grid { grid-template-columns: 1fr !important; }
+          .ch-detail-panel { position: static !important; max-height: none !important; margin-top: 12px; }
+          .ch-card-row { flex-wrap: wrap !important; gap: 8px !important; }
+          .ch-card-stats { gap: 12px !important; }
+        }
+        .ch-mobile-nav { display: none; }
+      `}</style>
+
       <div style={{ background: '#f5f6fa', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
+        {/* 모바일 상단 네비바 */}
+        <div className="ch-mobile-nav" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
+          background: '#1a1d2e', height: 52,
+          alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>📡 채널 분석</div>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(255,255,255,0.1)', borderRadius: 20,
+              padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
+            }}>
+              <span>📊</span><span>대시보드</span>
+            </div>
+          </Link>
+        </div>
+
         {/* 사이드바 */}
-        <div style={{
+        <div className="ch-sidebar" style={{
           position: 'fixed', left: 0, top: 0, bottom: 0, width: 220,
           background: '#1a1d2e', color: 'white', padding: '24px 0', zIndex: 100,
           display: 'flex', flexDirection: 'column'
@@ -189,13 +224,13 @@ export default function ChannelsPage() {
         </div>
 
         {/* 메인 */}
-        <div style={{ marginLeft: 220, padding: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div className="ch-main" style={{ marginLeft: 220, padding: 32 }}>
+          <div className="ch-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>채널 분석</h1>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널을 클릭하면 상세 내용을 볼 수 있습니다</p>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널을 탭하면 상세 내용을 볼 수 있습니다</p>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="ch-controls" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* 스테이징 토글 */}
               <button onClick={() => setShowStaging(s => !s)} style={{
                 padding: '6px 14px', borderRadius: 8, border: '1px solid',
@@ -252,7 +287,7 @@ export default function ChannelsPage() {
           ) : !data ? (
             <div style={{ textAlign: 'center', padding: 80, color: '#aaa' }}>데이터가 없습니다</div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: selectedChannel ? '1fr 380px' : '1fr', gap: 20 }}>
+            <div className="ch-grid" style={{ display: 'grid', gridTemplateColumns: selectedChannel ? '1fr 380px' : '1fr', gap: 20 }}>
 
               {/* 채널 카드 목록 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -282,7 +317,7 @@ export default function ChannelsPage() {
                         borderLeft: `5px solid ${color}`,
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div className="ch-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div style={{ width: 12, height: 12, borderRadius: '50%', background: color }} />
                           <span style={{ fontWeight: 600, fontSize: 15 }}>{label}</span>
@@ -291,7 +326,7 @@ export default function ChannelsPage() {
                             background: badge.bg, color: badge.color, fontWeight: 600
                           }}>{badge.label}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                        <div className="ch-card-stats" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                           {ch.sessions > 0 && (
                             <div style={{ textAlign: 'right' }}>
                               <div style={{ fontSize: 18, fontWeight: 700, color: '#555' }}>{ch.sessions.toLocaleString()}</div>
@@ -348,7 +383,7 @@ export default function ChannelsPage() {
 
               {/* 채널 상세 패널 */}
               {selectedChannel && selectedData && (
-                <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24, alignSelf: 'start', position: 'sticky', top: 20, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+                <div className="ch-detail-panel" style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24, alignSelf: 'start', position: 'sticky', top: 20, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
                   {/* 헤더 */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
