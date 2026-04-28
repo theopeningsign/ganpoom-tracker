@@ -16,6 +16,13 @@ export default async function handler(req, res) {
     : (() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d })()
   const end = endDate ? new Date(endDate + 'T23:59:59') : new Date()
 
+  const QUOTE_EVENTS = [
+    'comparison.request',
+    'simple.request',
+    'airbridge.ecommerce.order.completed',
+    'order.complete',
+  ]
+
   let base = supabase
     .from('events')
     .gte('created_at', start.toISOString())
@@ -38,13 +45,14 @@ export default async function handler(req, res) {
 
   // 캠페인 집계
   const { data: allEvents } = await base
-    .select('campaign, ad_group, event_category, device_type, platform, created_at')
+    .select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term')
 
   const campaigns = {}
   const categories = {}
   const devices = {}
   const platforms = {}
   const daily = {}
+  const keywords = {}
 
   ;(allEvents || []).forEach(ev => {
     // 캠페인
@@ -73,6 +81,15 @@ export default async function handler(req, res) {
       if (!daily[day]) daily[day] = 0
       daily[day]++
     }
+
+    // 키워드 (견적 이벤트만) - 네이버: k_keyword, 구글: utm_term
+    if (QUOTE_EVENTS.includes(ev.event_category)) {
+      const kw = ev.k_keyword || ev.utm_term
+      if (kw) {
+        if (!keywords[kw]) keywords[kw] = { keyword: kw, count: 0, source: ev.k_keyword ? 'naver' : 'google' }
+        keywords[kw].count++
+      }
+    }
   })
 
   // 일별 정렬
@@ -85,11 +102,16 @@ export default async function handler(req, res) {
     .sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ name, count }))
 
+  // 키워드 정렬
+  const keywordList = Object.values(keywords)
+    .sort((a, b) => b.count - a.count)
+
   return res.status(200).json({
     success: true,
     total: (allEvents || []).length,
     recentEvents: recentEvents || [],
     campaigns: campaignList,
+    keywords: keywordList,
     categories,
     devices,
     platforms,

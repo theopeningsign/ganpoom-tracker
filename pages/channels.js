@@ -105,7 +105,7 @@ export default function ChannelsPage() {
   const [detail, setDetail] = useState(null)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [detailTab, setDetailTab] = useState('events') // 'events' | 'campaigns' | 'trend'
+  const [detailTab, setDetailTab] = useState('events') // 'events' | 'campaigns' | 'keywords' | 'trend'
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -382,6 +382,7 @@ export default function ChannelsPage() {
                     {[
                       { key: 'events', label: '이벤트 내역' },
                       { key: 'campaigns', label: '캠페인' },
+                      ...(detail && detail.keywords && detail.keywords.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
                       { key: 'trend', label: '일별 추이' },
                     ].map(tab => (
                       <button key={tab.key} onClick={() => setDetailTab(tab.key)} style={{
@@ -482,6 +483,46 @@ export default function ChannelsPage() {
                               </div>
                             )
                           })}
+                        </div>
+                      )}
+
+                      {/* 키워드 탭 */}
+                      {detailTab === 'keywords' && (
+                        <div>
+                          <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
+                            견적요청을 만든 키워드 ({detail.keywords.length}개)
+                          </div>
+                          {detail.keywords.length === 0 ? (
+                            <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>키워드 데이터 없음</div>
+                          ) : (() => {
+                            const max = Math.max(...detail.keywords.map(k => k.count), 1)
+                            return detail.keywords.map((kw, i) => {
+                              const pct = (kw.count / max * 100).toFixed(1)
+                              const isNaver = kw.source === 'naver'
+                              return (
+                                <div key={kw.keyword} style={{ marginBottom: 12 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span style={{
+                                        fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600,
+                                        background: isNaver ? '#e8f9ee' : '#e8f0fe',
+                                        color: isNaver ? '#03C75A' : '#4285F4'
+                                      }}>{isNaver ? 'N' : 'G'}</span>
+                                      <span style={{ color: '#333', fontWeight: 500 }}>{kw.keyword}</span>
+                                    </div>
+                                    <span style={{ fontWeight: 700, color: '#333' }}>{kw.count}건</span>
+                                  </div>
+                                  <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
+                                    <div style={{
+                                      height: '100%', width: `${pct}%`,
+                                      background: isNaver ? '#03C75A' : '#4285F4',
+                                      borderRadius: 3, transition: 'width 0.4s'
+                                    }} />
+                                  </div>
+                                </div>
+                              )
+                            })
+                          })()}
                         </div>
                       )}
 
