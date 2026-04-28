@@ -24,33 +24,28 @@ export default async function handler(req, res) {
       : (() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d })()
     const end = endDate ? new Date(endDate + 'T23:59:59') : new Date()
 
-    const buildBase = () => {
-      let q = supabase
-        .from('events')
-        .gte('created_at', start.toISOString())
-        .lte('created_at', end.toISOString())
-
+    const applyFilters = (q) => {
+      q = q.gte('created_at', start.toISOString()).lte('created_at', end.toISOString())
       if (channel === 'unattributed') {
         q = q.or('channel.is.null,channel.eq.unattributed')
       } else {
         q = q.eq('channel', channel)
       }
-
       if (platform && platform !== 'all') q = q.eq('platform', platform)
       return q
     }
 
     // 최근 이벤트 목록 (최대 50건)
-    const { data: recentEvents, error: recentError } = await buildBase()
-      .select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50)
+    const { data: recentEvents, error: recentError } = await applyFilters(
+      supabase.from('events').select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at')
+    ).order('created_at', { ascending: false }).limit(50)
 
     if (recentError) console.error('recentEvents error:', recentError)
 
     // 전체 이벤트 집계
-    const { data: allEvents, error: allError } = await buildBase()
-      .select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term')
+    const { data: allEvents, error: allError } = await applyFilters(
+      supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term')
+    )
 
     if (allError) console.error('allEvents error:', allError)
 
