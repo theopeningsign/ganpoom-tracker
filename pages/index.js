@@ -18,6 +18,7 @@ const CHANNEL_LABELS = {
   'facebook.business': '페이스북',
   'kakao': '카카오 검색광고',
   'agency': 'CPA 에이전시',
+  'naver_powercontents': '네이버 파워컨텐츠',
   'naver_blog_official': '네이버 블로그',
   'instagram_official': '인스타그램',
   'unattributed': '자연유입',

@@ -4,6 +4,7 @@ import PasswordProtection from '../components/PasswordProtection'
 
 const CHANNEL_LABELS = {
   'naver.searchad': '네이버 검색광고',
+  'naver_powercontents': '네이버 파워컨텐츠',
   'google': '구글 광고',
   'tenping_web': '텐핑',
   'agency': 'CPA 에이전시',
@@ -14,6 +15,7 @@ const CHANNEL_LABELS = {
 
 const CHANNEL_COLORS = {
   'naver.searchad': '#03C75A',
+  'naver_powercontents': '#00A0E9',
   'google': '#4285F4',
   'tenping_web': '#FF6B35',
   'agency': '#9B59B6',
