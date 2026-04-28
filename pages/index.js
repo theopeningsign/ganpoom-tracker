@@ -278,7 +278,7 @@ export default function Dashboard() {
   const exportExcel = useCallback(async () => {
     setExporting(true)
     try {
-      const QUOTE_EVENTS = ['comparison.request', 'simple.request', 'airbridge.ecommerce.order.completed', 'order.complete', 'comparison.consult']
+      const QUOTE_EVENTS = ['comparison.request', 'simple.request', 'airbridge.ecommerce.order.completed', 'order.complete']
       const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
       const res = await fetch(`/api/events/export?${params}`)
       const json = await res.json()
