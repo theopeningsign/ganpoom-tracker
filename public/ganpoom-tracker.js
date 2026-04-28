@@ -64,6 +64,7 @@
         k_media: p.get('k_media'),       // 네이버 sub_id_1
         gclid: p.get('gclid'),
         ref: p.get('ref'),
+        jid: p.get('jid'),   // 텐핑
       };
     }
 
@@ -71,6 +72,7 @@
       if (params.gclid) return 'google';
       if (params.utm_source) return params.utm_source;
       if (params.k_campaign || params.k_adgroup) return 'naver.searchad';
+      if (params.jid) return 'tenping_web';  // 텐핑 자동 감지
       if (params.ref) return 'agency';
       return 'unattributed';
     }
@@ -192,7 +194,7 @@
 
     function initAttribution() {
       const params = getParams();
-      const hasAttr = params.utm_source || params.gclid || params.k_campaign || params.ref;
+      const hasAttr = params.utm_source || params.gclid || params.k_campaign || params.ref || params.jid;
       if (hasAttr) {
         const attr = {
           ...params,
