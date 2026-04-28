@@ -47,40 +47,37 @@ export default async function handler(req, res) {
     // 디버깅용 로그 (배포 후 제거 가능)
     // console.log('기간 필터:', { defaultStart, defaultEnd, startDateTime, endDateTime })
 
+    const QUOTE_EVENTS = [
+      'comparison.request',
+      'simple.request',
+      'airbridge.ecommerce.order.completed',
+      'order.complete',
+    ]
+
     const agentStats = await Promise.all(
       (agents || []).map(async (agent) => {
         try {
-          // 병렬로 클릭 수와 견적요청 조회
-          // 기간 필터: startDateTime <= clicked_at/created_at <= endDateTime
           const [clickResult, quoteResult] = await Promise.all([
             supabaseAdmin
               .from('link_clicks')
-              .select('*', { count: 'exact' })
+              .select('*', { count: 'exact', head: true })
               .eq('agent_id', agent.id)
-              .gte('clicked_at', startDateTime)
-              .lte('clicked_at', endDateTime),
+              .gte('created_at', startDateTime)
+              .lte('created_at', endDateTime),
             supabaseAdmin
-              .from('quote_requests')
-              .select('commission_amount, estimated_value')
+              .from('events')
+              .select('*', { count: 'exact', head: true })
               .eq('agent_id', agent.id)
+              .in('event_category', QUOTE_EVENTS)
               .gte('created_at', startDateTime)
               .lte('created_at', endDateTime)
           ])
 
-        const clickCount = clickResult.count || 0
-        const quotes = quoteResult.data || []
-        const quoteCount = quotes.length
-        const totalCommission = quotes.reduce((sum, item) => 
-          sum + (item.commission_amount || 10000), 0
-        ) || 0
-        const totalRevenue = quotes.reduce((sum, item) => 
-          sum + (item.estimated_value || 0), 0
-        ) || 0
+          const clickCount = clickResult.count || 0
+          const quoteCount = quoteResult.count || 0
+          const conversionRate = clickCount > 0 ?
+            ((quoteCount / clickCount) * 100).toFixed(1) : '0.0'
 
-        const conversionRate = clickCount > 0 ? 
-          ((quoteCount / clickCount) * 100).toFixed(1) : '0.0'
-
-          // 에이전트별 월별 통계는 모달에서만 로드 (성능 최적화)
           return {
             agentId: agent.id,
             name: agent.name,
@@ -90,36 +87,26 @@ export default async function handler(req, res) {
             email: agent.email || null,
             clicks: clickCount,
             quotes: quoteCount,
-            commission: totalCommission,
-            revenue: totalRevenue,
+            commission: 0,
+            revenue: 0,
             conversionRate: parseFloat(conversionRate),
             period: `${defaultStart} ~ ${defaultEnd}`
           }
         } catch (error) {
-          // 개별 에이전트 조회 실패 시 기본값 반환
           console.error(`에이전트 ${agent.id} 통계 조회 오류:`, error)
-          return {
-            agentId: agent.id,
-            name: agent.name,
-            phone: agent.phone || null,
-            account_number: agent.account_number || null,
-            memo: agent.memo || null,
-            email: agent.email || null,
-            clicks: 0,
-            quotes: 0,
-            commission: 0,
-            revenue: 0,
-            conversionRate: 0,
-            period: `${defaultStart} ~ ${defaultEnd}`
-          }
+          return null
         }
       })
     )
 
-    // 전체 통계 계산
-    const totalQuotes = agentStats.reduce((sum, agent) => sum + agent.quotes, 0)
-    const totalCommission = agentStats.reduce((sum, agent) => sum + agent.commission, 0)
-    const totalRevenue = agentStats.reduce((sum, agent) => sum + agent.revenue, 0)
+    // 성과 있는 에이전트만 필터링 (접속수 or 견적요청 1 이상)
+    const activeAgentStats = agentStats
+      .filter(a => a !== null && (a.clicks > 0 || a.quotes > 0))
+      .sort((a, b) => b.quotes - a.quotes || b.clicks - a.clicks)
+
+    const totalQuotes = activeAgentStats.reduce((sum, agent) => sum + agent.quotes, 0)
+    const totalCommission = 0
+    const totalRevenue = 0
 
     // 월별/일별 통계는 별도 API로 분리 (성능 최적화)
     res.status(200).json({
@@ -131,7 +118,7 @@ export default async function handler(req, res) {
       totalQuotes,
       totalCommission,
       totalRevenue,
-      agentStats: agentStats.sort((a, b) => b.quotes - a.quotes),
+      agentStats: activeAgentStats,
       monthlyStats: [], // 별도 API로 로드
       dailyStats: [] // 별도 API로 로드
     })
