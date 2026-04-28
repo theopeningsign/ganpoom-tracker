@@ -38,6 +38,7 @@ export default async function handler(req, res) {
     // 최근 이벤트 목록 (최대 50건)
     const { data: recentEvents, error: recentError } = await applyFilters(
       supabase.from('events').select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at')
+        .in('event_category', QUOTE_EVENTS)
     ).order('created_at', { ascending: false }).limit(50)
 
     if (recentError) console.error('recentEvents error:', recentError)
