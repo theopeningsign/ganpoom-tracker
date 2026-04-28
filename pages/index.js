@@ -278,19 +278,22 @@ export default function Dashboard() {
   const exportExcel = useCallback(async () => {
     setExporting(true)
     try {
+      const QUOTE_EVENTS = ['comparison.request', 'simple.request', 'airbridge.ecommerce.order.completed', 'order.complete']
       const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
       const res = await fetch(`/api/events/export?${params}`)
       const json = await res.json()
       if (!json.success) return
       const PERF_HEADERS = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Platform', 'Client IP City']
-      const perfRows = json.events.map(e => ([
-        formatEventCategory(e.event_category, e.platform),
-        e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
-        e.channel || 'unattributed',
-        e.campaign || e.utm_campaign || '',
-        e.os_name || (e.device_type === 'mobile' ? 'Mobile' : 'Desktop'),
-        e.client_ip_city || '',
-      ]))
+      const perfRows = json.events
+        .filter(e => QUOTE_EVENTS.includes(e.event_category))
+        .map(e => ([
+          formatEventCategory(e.event_category, e.platform),
+          e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
+          e.channel || 'unattributed',
+          e.campaign || e.utm_campaign || '',
+          e.os_name || (e.device_type === 'mobile' ? 'Mobile' : 'Desktop'),
+          e.client_ip_city || '',
+        ]))
       const ws = XLSX.utils.aoa_to_sheet([PERF_HEADERS, ...perfRows])
       ws['!cols'] = [42, 22, 20, 30, 14, 20].map(w => ({ wch: w }))
       const wb = XLSX.utils.book_new()
