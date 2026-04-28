@@ -58,6 +58,14 @@ export default async function handler(req, res) {
   // 전체 견적요청 수
   const total = events.length
 
+  // 채널별 방문수 집계 (session.start 이벤트)
+  const sessionMap = {}
+  allEvents.filter(e => e.event_category === 'session.start').forEach(e => {
+    const key = e.channel || 'unattributed'
+    sessionMap[key] = (sessionMap[key] || 0) + 1
+  })
+  const totalSessions = Object.values(sessionMap).reduce((s, v) => s + v, 0)
+
   // 채널별 집계 (견적 기준)
   const channelMap = {}
   events.forEach(e => {
@@ -65,7 +73,13 @@ export default async function handler(req, res) {
     if (!channelMap[key]) channelMap[key] = { channel: key, channel_type: e.channel_type || 'organic', count: 0 }
     channelMap[key].count++
   })
-  const channelStats = Object.values(channelMap).sort((a, b) => b.count - a.count)
+  const channelStats = Object.values(channelMap).map(ch => ({
+    ...ch,
+    sessions: sessionMap[ch.channel] || 0,
+    conversionRate: sessionMap[ch.channel] > 0
+      ? parseFloat(((ch.count / sessionMap[ch.channel]) * 100).toFixed(1))
+      : null,
+  })).sort((a, b) => b.count - a.count)
 
   // 견적 유형별 집계 (견적 이벤트만)
   const categoryMap = {}
@@ -111,6 +125,7 @@ export default async function handler(req, res) {
     success: true,
     summary: {
       total,
+      totalSessions,
       paid: typeMap.paid,
       organic: typeMap.organic,
       blog: typeMap.blog,

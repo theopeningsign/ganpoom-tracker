@@ -289,22 +289,56 @@ export default function ChannelsPage() {
                             background: badge.bg, color: badge.color, fontWeight: 600
                           }}>{badge.label}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                          {ch.sessions > 0 && (
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: '#555' }}>{ch.sessions.toLocaleString()}</div>
+                              <div style={{ fontSize: 11, color: '#aaa' }}>방문</div>
+                            </div>
+                          )}
                           <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: 22, fontWeight: 700 }}>{ch.count.toLocaleString()}</div>
-                            <div style={{ fontSize: 12, color: '#aaa' }}>전환</div>
+                            <div style={{ fontSize: 12, color: '#aaa' }}>견적요청</div>
                           </div>
-                          <div style={{ textAlign: 'right', minWidth: 50 }}>
-                            <div style={{ fontSize: 18, fontWeight: 600, color: '#888' }}>{pct}%</div>
-                            <div style={{ fontSize: 12, color: '#aaa' }}>비율</div>
+                          <div style={{ textAlign: 'right', minWidth: 58 }}>
+                            {ch.conversionRate !== null ? (
+                              <>
+                                <div style={{
+                                  fontSize: 18, fontWeight: 700,
+                                  color: ch.conversionRate >= 5 ? '#27ae60' : ch.conversionRate >= 2 ? '#f39c12' : '#e74c3c'
+                                }}>{ch.conversionRate}%</div>
+                                <div style={{ fontSize: 11, color: '#aaa' }}>전환율</div>
+                              </>
+                            ) : (
+                              <>
+                                <div style={{ fontSize: 18, fontWeight: 600, color: '#888' }}>{pct}%</div>
+                                <div style={{ fontSize: 12, color: '#aaa' }}>비율</div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      {/* 진행바 */}
-                      <div style={{ marginTop: 14, height: 4, background: '#f0f0f0', borderRadius: 2 }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.4s' }} />
-                      </div>
+                      {/* 퍼널 / 진행바 */}
+                      {ch.sessions > 0 ? (
+                        <div style={{ marginTop: 14 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#bbb', marginBottom: 4 }}>
+                            <span>방문 {ch.sessions.toLocaleString()}</span>
+                            <span>견적 {ch.count.toLocaleString()}</span>
+                          </div>
+                          <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3, position: 'relative' }}>
+                            <div style={{
+                              position: 'absolute', left: 0, top: 0, height: '100%',
+                              width: `${Math.min((ch.count / ch.sessions) * 100, 100)}%`,
+                              background: color, borderRadius: 3, transition: 'width 0.4s'
+                            }} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: 14, height: 4, background: '#f0f0f0', borderRadius: 2 }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.4s' }} />
+                        </div>
+                      )}
                     </div>
                   )
                 })}

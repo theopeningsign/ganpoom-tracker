@@ -211,9 +211,11 @@
     }
 
     function init() {
+      const isNewSession = !Cookie.get(CONFIG.sessionKey); // 세션 생성 전에 체크
       initAttribution();
       ready = true;
       flush();
+      if (isNewSession) send('session.start', {}); // 신규 방문자만 전송
       log('initialized');
     }
 
