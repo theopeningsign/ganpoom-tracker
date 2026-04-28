@@ -66,20 +66,39 @@ export default async function handler(req, res) {
   })
   const totalSessions = Object.values(sessionMap).reduce((s, v) => s + v, 0)
 
-  // 채널별 집계 (견적 기준)
+  // 채널별 집계 (견적 기준) - channel_type 참조용
+  const channelTypeMap = {}
+  allEvents.forEach(e => {
+    const key = e.channel || 'unattributed'
+    if (!channelTypeMap[key]) channelTypeMap[key] = e.channel_type || 'organic'
+  })
+
+  // 방문 or 견적 있는 모든 채널 합치기
+  const allChannelKeys = new Set([
+    ...Object.keys(sessionMap),
+    ...events.map(e => e.channel || 'unattributed')
+  ])
+
   const channelMap = {}
   events.forEach(e => {
     const key = e.channel || 'unattributed'
-    if (!channelMap[key]) channelMap[key] = { channel: key, channel_type: e.channel_type || 'organic', count: 0 }
-    channelMap[key].count++
+    if (!channelMap[key]) channelMap[key] = 0
+    channelMap[key]++
   })
-  const channelStats = Object.values(channelMap).map(ch => ({
-    ...ch,
-    sessions: sessionMap[ch.channel] || 0,
-    conversionRate: sessionMap[ch.channel] > 0
-      ? parseFloat(((ch.count / sessionMap[ch.channel]) * 100).toFixed(1))
-      : null,
-  })).sort((a, b) => b.count - a.count)
+
+  const channelStats = Array.from(allChannelKeys).map(key => {
+    const count = channelMap[key] || 0
+    const sessions = sessionMap[key] || 0
+    return {
+      channel: key,
+      channel_type: channelTypeMap[key] || 'organic',
+      count,
+      sessions,
+      conversionRate: sessions > 0
+        ? parseFloat(((count / sessions) * 100).toFixed(1))
+        : null,
+    }
+  }).sort((a, b) => b.count - a.count || b.sessions - a.sessions)
 
   // 견적 유형별 집계 (견적 이벤트만)
   const categoryMap = {}
