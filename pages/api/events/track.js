@@ -7,6 +7,7 @@ const supabase = createClient(
 
 // 저장할 전환 이벤트 목록 (페이지뷰 제외)
 const ALLOWED_EVENTS = new Set([
+  'session.start',
   'comparison.request',
   'simple.request',
   'order.complete',
