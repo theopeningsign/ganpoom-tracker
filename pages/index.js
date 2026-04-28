@@ -144,7 +144,7 @@ const NAV = [
 
 function Sidebar({ current }) {
   return (
-    <div style={{
+    <div className="gp-sidebar" style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: 220,
       background: '#1a1d2e', color: 'white', padding: '24px 0', zIndex: 100,
       display: 'flex', flexDirection: 'column'
@@ -305,6 +305,20 @@ export default function Dashboard() {
 
   return (
     <>
+    <style>{`
+      @media (max-width: 768px) {
+        .gp-sidebar { display: none !important; }
+        .gp-main { margin-left: 0 !important; padding: 16px !important; }
+        .gp-stat-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
+        .gp-two-col { grid-template-columns: 1fr !important; }
+        .gp-controls { width: 100%; margin-top: 12px; }
+        .gp-controls input[type="date"] { width: 130px; font-size: 12px !important; padding: 6px 8px !important; }
+        .gp-modal-box { width: 92% !important; }
+      }
+      @media (max-width: 480px) {
+        .gp-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+      }
+    `}</style>
     {/* 전환 유형 상세 모달 */}
     {categoryModal && (
       <div
@@ -313,6 +327,7 @@ export default function Dashboard() {
       >
         <div
           onClick={e => e.stopPropagation()}
+          className="gp-modal-box"
           style={{ background: 'white', borderRadius: 16, width: 480, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}
         >
           {/* 헤더 */}
@@ -378,7 +393,7 @@ export default function Dashboard() {
     <PasswordProtection>
       <div style={{ background: '#f5f6fa', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
         <Sidebar current="/" />
-        <div style={{ marginLeft: 220, padding: 32 }}>
+        <div className="gp-main" style={{ marginLeft: 220, padding: 32 }}>
 
           {/* 헤더 */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
@@ -386,7 +401,7 @@ export default function Dashboard() {
               <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>대시보드</h1>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 견적요청 현황</p>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="gp-controls" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* 스테이징 토글 */}
               <button onClick={() => setShowStaging(s => !s)} style={{
                 padding: '6px 14px', borderRadius: 8, border: '1px solid',
@@ -455,7 +470,7 @@ export default function Dashboard() {
           ) : (
             <>
               {/* 요약 카드 */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16, marginBottom: 28 }}>
+              <div className="gp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16, marginBottom: 28 }}>
                 <StatCard label="전체 견적요청" value={data.summary.total} color="#4facfe" />
                 <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" />
                 <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" />
@@ -465,7 +480,7 @@ export default function Dashboard() {
               </div>
 
               {/* 채널 테이블 + 일별 추이 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+              <div className="gp-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
                 <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                   <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>채널별 견적요청</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -522,7 +537,7 @@ export default function Dashboard() {
               </div>
 
               {/* 견적 유형 + 플랫폼/기기 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="gp-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
                   <div style={{ padding: '18px 24px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 15 }}>견적요청 유형</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
