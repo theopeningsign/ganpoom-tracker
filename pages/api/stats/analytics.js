@@ -52,6 +52,7 @@ export default async function handler(req, res) {
       'simple.request',
       'airbridge.ecommerce.order.completed',
       'order.complete',
+      'comparison.consult',
     ]
 
     const agentStats = await Promise.all(

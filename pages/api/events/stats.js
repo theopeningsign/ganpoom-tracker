@@ -11,6 +11,7 @@ const QUOTE_EVENTS = [
   'simple.request',
   'airbridge.ecommerce.order.completed',
   'order.complete',
+  'comparison.consult',
 ]
 
 // 회원가입 이벤트
