@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../../../lib/supabase'
+import { QUOTE_EVENTS } from '../../../lib/constants'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -46,13 +47,6 @@ export default async function handler(req, res) {
     
     // 디버깅용 로그 (배포 후 제거 가능)
     // console.log('기간 필터:', { defaultStart, defaultEnd, startDateTime, endDateTime })
-
-    const QUOTE_EVENTS = [
-      'comparison.request',
-      'simple.request',
-      'airbridge.ecommerce.order.completed',
-      'order.complete',
-    ]
 
     const agentStats = await Promise.all(
       (agents || []).map(async (agent) => {

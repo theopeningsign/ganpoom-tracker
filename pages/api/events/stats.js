@@ -1,22 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
+import { QUOTE_EVENTS, SIGNUP_EVENTS } from '../../../lib/constants'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
-
-// 견적요청으로 집계할 이벤트
-const QUOTE_EVENTS = [
-  'comparison.request',
-  'simple.request',
-  'airbridge.ecommerce.order.completed',
-  'order.complete',
-]
-
-// 회원가입 이벤트
-const SIGNUP_EVENTS = [
-  'airbridge.user.signup',
-]
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
