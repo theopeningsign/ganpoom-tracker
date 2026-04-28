@@ -111,6 +111,21 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, skipped: true })
     }
 
+    // 중복 이벤트 방지 (같은 session_id + event_category 5초 이내 재전송 차단)
+    const sessionId = body.session_id || null
+    if (sessionId) {
+      const fiveSecsAgo = new Date(Date.now() - 5000).toISOString()
+      const { count } = await supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sessionId)
+        .eq('event_category', normalized || body.event_category || '')
+        .gte('created_at', fiveSecsAgo)
+      if (count > 0) {
+        return res.status(200).json({ success: true, skipped: true, reason: 'duplicate' })
+      }
+    }
+
     // IP 추출 (프록시/로드밸런서 고려)
     const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
     const ipLocation = await getIpLocation(ip)
