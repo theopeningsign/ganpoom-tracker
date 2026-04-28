@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import PasswordProtection from '../components/PasswordProtection'
 
@@ -28,13 +28,6 @@ const TYPE_BADGE = {
   paid: { label: '유료', bg: '#fff3cd', color: '#856404' },
   organic: { label: '오가닉', bg: '#d1ecf1', color: '#0c5460' },
   cpa: { label: 'CPA', bg: '#f8d7da', color: '#721c24' },
-}
-
-const CATEGORY_LABELS = {
-  'comparison.request': '비교견적 요청',
-  'order.complete': '주문 완료',
-  'simple.request': '간단 견적요청',
-  'home.screen': '홈화면 조회',
 }
 
 function toYMD(date) {
@@ -96,6 +89,242 @@ const EVENT_LABELS = {
   'event.conversion': '전환',
 }
 
+// ─── 채널 상세 패널 (공통 컴포넌트) ──────────────────────────────────────────
+function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, isInline }) {
+  if (!selectedChannel || !selectedData) return null
+  const color = CHANNEL_COLORS[selectedChannel] || '#bbb'
+
+  return (
+    <div style={{
+      background: 'white', borderRadius: 12,
+      boxShadow: isInline ? '0 2px 12px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.08)',
+      padding: 24,
+      ...(isInline ? {} : { alignSelf: 'start', position: 'sticky', top: 20, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' })
+    }}>
+      {/* 헤더 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>
+            {CHANNEL_LABELS[selectedChannel] || selectedChannel}
+          </h3>
+        </div>
+        <button onClick={() => setSelectedChannel(null)} style={{
+          border: 'none', background: '#f5f5f5', borderRadius: 6, padding: '4px 10px',
+          fontSize: 12, cursor: 'pointer', color: '#666'
+        }}>✕ 닫기</button>
+      </div>
+
+      {/* 요약 카드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+        <div style={{ padding: '12px 14px', background: '#f8f9fa', borderRadius: 8 }}>
+          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>총 전환</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color }}>
+            {selectedData.count.toLocaleString()}
+          </div>
+        </div>
+        <div style={{ padding: '12px 14px', background: '#f8f9fa', borderRadius: 8 }}>
+          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>캠페인 수</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#555' }}>
+            {detail ? detail.campaigns.filter(c => c.name !== '(없음)').length : '-'}
+          </div>
+        </div>
+      </div>
+
+      {/* 탭 */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f5f6fa', borderRadius: 8, padding: 4 }}>
+        {[
+          { key: 'events', label: '이벤트 내역' },
+          { key: 'campaigns', label: '캠페인' },
+          ...(detail && detail.keywords && detail.keywords.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
+          { key: 'trend', label: '일별 추이' },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setDetailTab(tab.key)} style={{
+            flex: 1, padding: '7px 0', border: 'none', borderRadius: 6,
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            background: detailTab === tab.key ? 'white' : 'transparent',
+            color: detailTab === tab.key ? '#333' : '#888',
+            boxShadow: detailTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {detailLoading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>불러오는 중...</div>
+      ) : !detail ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#ccc', fontSize: 13 }}>데이터 없음</div>
+      ) : (
+        <>
+          {/* 이벤트 내역 탭 */}
+          {detailTab === 'events' && (
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>
+                최근 {detail.recentEvents.length}건 (최대 50건)
+              </div>
+              {detail.recentEvents.length === 0 ? (
+                <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>이벤트 없음</div>
+              ) : detail.recentEvents.map((ev, i) => {
+                const dt = new Date(ev.created_at)
+                const dateStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+                return (
+                  <div key={ev.id || i}
+                    onClick={() => setSelectedEvent(ev)}
+                    style={{
+                      padding: '10px 0',
+                      borderBottom: '1px solid #f0f0f0',
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      cursor: 'pointer', borderRadius: 6,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{
+                        fontSize: 12, fontWeight: 600,
+                        background: '#eef4ff', color: '#4facfe',
+                        padding: '2px 8px', borderRadius: 20
+                      }}>
+                        {EVENT_LABELS[ev.event_category] || ev.event_category}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#aaa' }}>{dateStr}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {ev.campaign && (
+                        <span style={{ fontSize: 11, color: '#666' }}>📢 {ev.campaign}</span>
+                      )}
+                      {ev.device_type && (
+                        <span style={{ fontSize: 11, color: '#888' }}>
+                          {ev.device_type === 'mobile' ? '📱' : '🖥️'} {ev.device_type}
+                        </span>
+                      )}
+                      {ev.client_ip_city && (
+                        <span style={{ fontSize: 11, color: '#888' }}>📍 {ev.client_ip_city}</span>
+                      )}
+                      {ev.platform === 'app' && (
+                        <span style={{ fontSize: 11, color: '#9B59B6', fontWeight: 600 }}>앱</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* 캠페인 탭 */}
+          {detailTab === 'campaigns' && (
+            <div>
+              {detail.campaigns.length === 0 ? (
+                <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
+              ) : detail.campaigns.map(camp => {
+                const pct = detail.total > 0 ? (camp.count / detail.total * 100).toFixed(1) : 0
+                return (
+                  <div key={camp.name} style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
+                      <span style={{ color: camp.name === '(없음)' ? '#bbb' : '#333', fontWeight: 500 }}>
+                        {camp.name}
+                      </span>
+                      <span style={{ fontWeight: 700 }}>
+                        {camp.count}건
+                        <span style={{ color: '#aaa', fontWeight: 400, fontSize: 12 }}> ({pct}%)</span>
+                      </span>
+                    </div>
+                    <div style={{ height: 5, background: '#f0f0f0', borderRadius: 3 }}>
+                      <div style={{
+                        height: '100%', width: `${pct}%`,
+                        background: color, borderRadius: 3
+                      }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* 키워드 탭 */}
+          {detailTab === 'keywords' && (
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
+                견적요청을 만든 키워드 ({detail.keywords.length}개)
+              </div>
+              {detail.keywords.length === 0 ? (
+                <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>키워드 데이터 없음</div>
+              ) : (() => {
+                const max = Math.max(...detail.keywords.map(k => k.visits), 1)
+                return detail.keywords.map((kw) => {
+                  const pct = (kw.visits / max * 100).toFixed(1)
+                  const isNaver = kw.source === 'naver'
+                  const convRate = kw.visits > 0 ? ((kw.quotes / kw.visits) * 100).toFixed(1) : '0.0'
+                  return (
+                    <div key={kw.keyword} style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{
+                            fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600,
+                            background: isNaver ? '#e8f9ee' : '#e8f0fe',
+                            color: isNaver ? '#03C75A' : '#4285F4'
+                          }}>{isNaver ? 'N' : 'G'}</span>
+                          <span style={{ color: '#333', fontWeight: 500 }}>{kw.keyword}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: '#888' }}>방문 {kw.visits}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#333' }}>견적 {kw.quotes}건</span>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700,
+                            color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c'
+                          }}>{convRate}%</span>
+                        </div>
+                      </div>
+                      <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
+                        <div style={{
+                          height: '100%', width: `${pct}%`,
+                          background: isNaver ? '#03C75A' : '#4285F4',
+                          borderRadius: 3, transition: 'width 0.4s'
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          )}
+
+          {/* 일별 추이 탭 */}
+          {detailTab === 'trend' && (
+            <div>
+              {detail.dailyTrend.length === 0 ? (
+                <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
+              ) : (() => {
+                const max = Math.max(...detail.dailyTrend.map(d => d.count), 1)
+                return detail.dailyTrend.map(d => {
+                  const pct = (d.count / max * 100).toFixed(1)
+                  const date = new Date(d.date)
+                  const label = `${date.getMonth()+1}/${date.getDate()}`
+                  return (
+                    <div key={d.date} style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ fontSize: 12, color: '#888', minWidth: 36 }}>{label}</div>
+                      <div style={{ flex: 1, height: 18, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', width: `${pct}%`,
+                          background: color,
+                          borderRadius: 4, minWidth: d.count > 0 ? 24 : 0
+                        }} />
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#555', minWidth: 28, textAlign: 'right' }}>
+                        {d.count}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 export default function ChannelsPage() {
   const [dates, setDates] = useState(getDefaultDates)
   const [activePreset, setActivePreset] = useState('today')
@@ -107,7 +336,8 @@ export default function ChannelsPage() {
   const [detail, setDetail] = useState(null)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [detailTab, setDetailTab] = useState('events') // 'events' | 'campaigns' | 'keywords' | 'trend'
+  const [detailTab, setDetailTab] = useState('events')
+  const inlineDetailRef = useRef(null)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
@@ -149,9 +379,20 @@ export default function ChannelsPage() {
     }
   }, [selectedChannel, fetchDetail])
 
+  // 모바일에서 인라인 상세패널 열리면 자동 스크롤
+  useEffect(() => {
+    if (selectedChannel && inlineDetailRef.current) {
+      setTimeout(() => {
+        inlineDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }, 80)
+    }
+  }, [selectedChannel])
+
   const selectedData = selectedChannel && data
     ? data.channelStats.find(c => c.channel === selectedChannel)
     : null
+
+  const detailPanelProps = { selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent }
 
   return (
     <PasswordProtection>
@@ -163,12 +404,17 @@ export default function ChannelsPage() {
           .ch-header { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
           .ch-header h1 { font-size: 20px !important; }
           .ch-controls { width: 100% !important; justify-content: flex-start !important; flex-wrap: wrap !important; }
+          /* 모바일: 그리드 단일 컬럼, 사이드 패널 숨김 */
           .ch-grid { grid-template-columns: 1fr !important; }
-          .ch-detail-panel { position: static !important; max-height: none !important; margin-top: 12px; }
+          .ch-detail-side { display: none !important; }
+          /* 모바일: 인라인 패널 표시 */
+          .ch-detail-inline { display: block !important; }
           .ch-card-row { flex-wrap: wrap !important; gap: 8px !important; }
           .ch-card-stats { gap: 12px !important; }
         }
         .ch-mobile-nav { display: none; }
+        /* 데스크탑: 인라인 패널 숨김 */
+        .ch-detail-inline { display: none; }
       `}</style>
 
       <div style={{ background: '#f5f6fa', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -231,7 +477,6 @@ export default function ChannelsPage() {
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널을 탭하면 상세 내용을 볼 수 있습니다</p>
             </div>
             <div className="ch-controls" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {/* 스테이징 토글 */}
               <button onClick={() => setShowStaging(s => !s)} style={{
                 padding: '6px 14px', borderRadius: 8, border: '1px solid',
                 borderColor: showStaging ? '#f39c12' : '#ddd',
@@ -249,7 +494,6 @@ export default function ChannelsPage() {
                 <option value="app">앱</option>
               </select>
 
-              {/* 기간 프리셋 버튼 */}
               <div style={{ display: 'flex', gap: 4, background: '#f0f2f5', borderRadius: 8, padding: 3 }}>
                 {DATE_PRESETS.map(({ key, label }) => (
                   <button key={key} onClick={() => {
@@ -307,73 +551,82 @@ export default function ChannelsPage() {
                   const isSelected = selectedChannel === ch.channel
 
                   return (
-                    <div
-                      key={ch.channel}
-                      onClick={() => setSelectedChannel(isSelected ? null : ch.channel)}
-                      style={{
-                        background: 'white', borderRadius: 12, padding: '20px 24px',
-                        boxShadow: isSelected ? `0 0 0 2px ${color}, 0 4px 16px rgba(0,0,0,0.1)` : '0 2px 8px rgba(0,0,0,0.08)',
-                        cursor: 'pointer', transition: 'all 0.15s',
-                        borderLeft: `5px solid ${color}`,
-                      }}
-                    >
-                      <div className="ch-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{ width: 12, height: 12, borderRadius: '50%', background: color }} />
-                          <span style={{ fontWeight: 600, fontSize: 15 }}>{label}</span>
-                          <span style={{
-                            fontSize: 11, padding: '2px 8px', borderRadius: 20,
-                            background: badge.bg, color: badge.color, fontWeight: 600
-                          }}>{badge.label}</span>
-                        </div>
-                        <div className="ch-card-stats" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                          {ch.sessions > 0 && (
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: '#555' }}>{ch.sessions.toLocaleString()}</div>
-                              <div style={{ fontSize: 11, color: '#aaa' }}>방문</div>
-                            </div>
-                          )}
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: 22, fontWeight: 700 }}>{ch.count.toLocaleString()}</div>
-                            <div style={{ fontSize: 12, color: '#aaa' }}>견적요청</div>
+                    <div key={ch.channel}>
+                      {/* 채널 카드 */}
+                      <div
+                        onClick={() => setSelectedChannel(isSelected ? null : ch.channel)}
+                        style={{
+                          background: 'white', borderRadius: 12, padding: '20px 24px',
+                          boxShadow: isSelected ? `0 0 0 2px ${color}, 0 4px 16px rgba(0,0,0,0.1)` : '0 2px 8px rgba(0,0,0,0.08)',
+                          cursor: 'pointer', transition: 'all 0.15s',
+                          borderLeft: `5px solid ${color}`,
+                        }}
+                      >
+                        <div className="ch-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: color }} />
+                            <span style={{ fontWeight: 600, fontSize: 15 }}>{label}</span>
+                            <span style={{
+                              fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                              background: badge.bg, color: badge.color, fontWeight: 600
+                            }}>{badge.label}</span>
                           </div>
-                          <div style={{ textAlign: 'right', minWidth: 58 }}>
-                            {ch.conversionRate !== null ? (
-                              <>
-                                <div style={{
-                                  fontSize: 18, fontWeight: 700,
-                                  color: ch.conversionRate >= 5 ? '#27ae60' : ch.conversionRate >= 2 ? '#f39c12' : '#e74c3c'
-                                }}>{ch.conversionRate}%</div>
-                                <div style={{ fontSize: 11, color: '#aaa' }}>전환율</div>
-                              </>
-                            ) : (
-                              <>
-                                <div style={{ fontSize: 18, fontWeight: 600, color: '#888' }}>{pct}%</div>
-                                <div style={{ fontSize: 12, color: '#aaa' }}>비율</div>
-                              </>
+                          <div className="ch-card-stats" style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                            {ch.sessions > 0 && (
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: '#555' }}>{ch.sessions.toLocaleString()}</div>
+                                <div style={{ fontSize: 11, color: '#aaa' }}>방문</div>
+                              </div>
                             )}
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: 22, fontWeight: 700 }}>{ch.count.toLocaleString()}</div>
+                              <div style={{ fontSize: 12, color: '#aaa' }}>견적요청</div>
+                            </div>
+                            <div style={{ textAlign: 'right', minWidth: 58 }}>
+                              {ch.conversionRate !== null ? (
+                                <>
+                                  <div style={{
+                                    fontSize: 18, fontWeight: 700,
+                                    color: ch.conversionRate >= 5 ? '#27ae60' : ch.conversionRate >= 2 ? '#f39c12' : '#e74c3c'
+                                  }}>{ch.conversionRate}%</div>
+                                  <div style={{ fontSize: 11, color: '#aaa' }}>전환율</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div style={{ fontSize: 18, fontWeight: 600, color: '#888' }}>{pct}%</div>
+                                  <div style={{ fontSize: 12, color: '#aaa' }}>비율</div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
+
+                        {/* 퍼널 / 진행바 */}
+                        {ch.sessions > 0 ? (
+                          <div style={{ marginTop: 14 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#bbb', marginBottom: 4 }}>
+                              <span>방문 {ch.sessions.toLocaleString()}</span>
+                              <span>견적 {ch.count.toLocaleString()}</span>
+                            </div>
+                            <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3, position: 'relative' }}>
+                              <div style={{
+                                position: 'absolute', left: 0, top: 0, height: '100%',
+                                width: `${Math.min((ch.count / ch.sessions) * 100, 100)}%`,
+                                background: color, borderRadius: 3, transition: 'width 0.4s'
+                              }} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 14, height: 4, background: '#f0f0f0', borderRadius: 2 }}>
+                            <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.4s' }} />
+                          </div>
+                        )}
                       </div>
 
-                      {/* 퍼널 / 진행바 */}
-                      {ch.sessions > 0 ? (
-                        <div style={{ marginTop: 14 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#bbb', marginBottom: 4 }}>
-                            <span>방문 {ch.sessions.toLocaleString()}</span>
-                            <span>견적 {ch.count.toLocaleString()}</span>
-                          </div>
-                          <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3, position: 'relative' }}>
-                            <div style={{
-                              position: 'absolute', left: 0, top: 0, height: '100%',
-                              width: `${Math.min((ch.count / ch.sessions) * 100, 100)}%`,
-                              background: color, borderRadius: 3, transition: 'width 0.4s'
-                            }} />
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ marginTop: 14, height: 4, background: '#f0f0f0', borderRadius: 2 }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2, transition: 'width 0.4s' }} />
+                      {/* 모바일 전용 인라인 상세패널 (카드 바로 아래) */}
+                      {isSelected && (
+                        <div className="ch-detail-inline" ref={inlineDetailRef} style={{ marginTop: 8 }}>
+                          <DetailPanel {...detailPanelProps} isInline={true} />
                         </div>
                       )}
                     </div>
@@ -381,229 +634,10 @@ export default function ChannelsPage() {
                 })}
               </div>
 
-              {/* 채널 상세 패널 */}
+              {/* 데스크탑 전용 사이드 상세패널 */}
               {selectedChannel && selectedData && (
-                <div className="ch-detail-panel" style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24, alignSelf: 'start', position: 'sticky', top: 20, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
-                  {/* 헤더 */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: CHANNEL_COLORS[selectedChannel] || '#bbb' }} />
-                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>
-                        {CHANNEL_LABELS[selectedChannel] || selectedChannel}
-                      </h3>
-                    </div>
-                    <button onClick={() => setSelectedChannel(null)} style={{
-                      border: 'none', background: '#f5f5f5', borderRadius: 6, padding: '4px 10px',
-                      fontSize: 12, cursor: 'pointer', color: '#666'
-                    }}>✕ 닫기</button>
-                  </div>
-
-                  {/* 요약 카드 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
-                    <div style={{ padding: '12px 14px', background: '#f8f9fa', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>총 전환</div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: CHANNEL_COLORS[selectedChannel] || '#333' }}>
-                        {selectedData.count.toLocaleString()}
-                      </div>
-                    </div>
-                    <div style={{ padding: '12px 14px', background: '#f8f9fa', borderRadius: 8 }}>
-                      <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>캠페인 수</div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: '#555' }}>
-                        {detail ? detail.campaigns.filter(c => c.name !== '(없음)').length : '-'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 탭 */}
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: '#f5f6fa', borderRadius: 8, padding: 4 }}>
-                    {[
-                      { key: 'events', label: '이벤트 내역' },
-                      { key: 'campaigns', label: '캠페인' },
-                      ...(detail && detail.keywords && detail.keywords.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
-                      { key: 'trend', label: '일별 추이' },
-                    ].map(tab => (
-                      <button key={tab.key} onClick={() => setDetailTab(tab.key)} style={{
-                        flex: 1, padding: '7px 0', border: 'none', borderRadius: 6,
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        background: detailTab === tab.key ? 'white' : 'transparent',
-                        color: detailTab === tab.key ? '#333' : '#888',
-                        boxShadow: detailTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                      }}>{tab.label}</button>
-                    ))}
-                  </div>
-
-                  {detailLoading ? (
-                    <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>불러오는 중...</div>
-                  ) : !detail ? (
-                    <div style={{ textAlign: 'center', padding: 40, color: '#ccc', fontSize: 13 }}>데이터 없음</div>
-                  ) : (
-                    <>
-                      {/* 이벤트 내역 탭 */}
-                      {detailTab === 'events' && (
-                        <div>
-                          <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>
-                            최근 {detail.recentEvents.length}건 (최대 50건)
-                          </div>
-                          {detail.recentEvents.length === 0 ? (
-                            <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>이벤트 없음</div>
-                          ) : detail.recentEvents.map((ev, i) => {
-                            const dt = new Date(ev.created_at)
-                            const dateStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
-                            return (
-                              <div key={ev.id || i}
-                                onClick={() => setSelectedEvent(ev)}
-                                style={{
-                                padding: '10px 0',
-                                borderBottom: '1px solid #f0f0f0',
-                                display: 'flex', flexDirection: 'column', gap: 4,
-                                cursor: 'pointer', borderRadius: 6,
-                              }}
-                              onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{
-                                    fontSize: 12, fontWeight: 600,
-                                    background: '#eef4ff', color: '#4facfe',
-                                    padding: '2px 8px', borderRadius: 20
-                                  }}>
-                                    {EVENT_LABELS[ev.event_category] || ev.event_category}
-                                  </span>
-                                  <span style={{ fontSize: 11, color: '#aaa' }}>{dateStr}</span>
-                                </div>
-                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                  {ev.campaign && (
-                                    <span style={{ fontSize: 11, color: '#666' }}>📢 {ev.campaign}</span>
-                                  )}
-                                  {ev.device_type && (
-                                    <span style={{ fontSize: 11, color: '#888' }}>
-                                      {ev.device_type === 'mobile' ? '📱' : '🖥️'} {ev.device_type}
-                                    </span>
-                                  )}
-                                  {ev.client_ip_city && (
-                                    <span style={{ fontSize: 11, color: '#888' }}>📍 {ev.client_ip_city}</span>
-                                  )}
-                                  {ev.platform === 'app' && (
-                                    <span style={{ fontSize: 11, color: '#9B59B6', fontWeight: 600 }}>앱</span>
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {/* 캠페인 탭 */}
-                      {detailTab === 'campaigns' && (
-                        <div>
-                          {detail.campaigns.length === 0 ? (
-                            <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
-                          ) : detail.campaigns.map(camp => {
-                            const pct = detail.total > 0 ? (camp.count / detail.total * 100).toFixed(1) : 0
-                            return (
-                              <div key={camp.name} style={{ marginBottom: 14 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                                  <span style={{ color: camp.name === '(없음)' ? '#bbb' : '#333', fontWeight: 500 }}>
-                                    {camp.name}
-                                  </span>
-                                  <span style={{ fontWeight: 700 }}>
-                                    {camp.count}건
-                                    <span style={{ color: '#aaa', fontWeight: 400, fontSize: 12 }}> ({pct}%)</span>
-                                  </span>
-                                </div>
-                                <div style={{ height: 5, background: '#f0f0f0', borderRadius: 3 }}>
-                                  <div style={{
-                                    height: '100%', width: `${pct}%`,
-                                    background: CHANNEL_COLORS[selectedChannel] || '#4facfe', borderRadius: 3
-                                  }} />
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {/* 키워드 탭 */}
-                      {detailTab === 'keywords' && (
-                        <div>
-                          <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
-                            견적요청을 만든 키워드 ({detail.keywords.length}개)
-                          </div>
-                          {detail.keywords.length === 0 ? (
-                            <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>키워드 데이터 없음</div>
-                          ) : (() => {
-                            const max = Math.max(...detail.keywords.map(k => k.visits), 1)
-                            return detail.keywords.map((kw) => {
-                              const pct = (kw.visits / max * 100).toFixed(1)
-                              const isNaver = kw.source === 'naver'
-                              const convRate = kw.visits > 0 ? ((kw.quotes / kw.visits) * 100).toFixed(1) : '0.0'
-                              return (
-                                <div key={kw.keyword} style={{ marginBottom: 14 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <span style={{
-                                        fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600,
-                                        background: isNaver ? '#e8f9ee' : '#e8f0fe',
-                                        color: isNaver ? '#03C75A' : '#4285F4'
-                                      }}>{isNaver ? 'N' : 'G'}</span>
-                                      <span style={{ color: '#333', fontWeight: 500 }}>{kw.keyword}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                                      <span style={{ fontSize: 11, color: '#888' }}>방문 {kw.visits}</span>
-                                      <span style={{ fontSize: 12, fontWeight: 700, color: '#333' }}>견적 {kw.quotes}건</span>
-                                      <span style={{
-                                        fontSize: 11, fontWeight: 700,
-                                        color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c'
-                                      }}>{convRate}%</span>
-                                    </div>
-                                  </div>
-                                  <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
-                                    <div style={{
-                                      height: '100%', width: `${pct}%`,
-                                      background: isNaver ? '#03C75A' : '#4285F4',
-                                      borderRadius: 3, transition: 'width 0.4s'
-                                    }} />
-                                  </div>
-                                </div>
-                              )
-                            })
-                          })()}
-                        </div>
-                      )}
-
-                      {/* 일별 추이 탭 */}
-                      {detailTab === 'trend' && (
-                        <div>
-                          {detail.dailyTrend.length === 0 ? (
-                            <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
-                          ) : (() => {
-                            const max = Math.max(...detail.dailyTrend.map(d => d.count), 1)
-                            return detail.dailyTrend.map(d => {
-                              const pct = (d.count / max * 100).toFixed(1)
-                              const date = new Date(d.date)
-                              const label = `${date.getMonth()+1}/${date.getDate()}`
-                              return (
-                                <div key={d.date} style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                  <div style={{ fontSize: 12, color: '#888', minWidth: 36 }}>{label}</div>
-                                  <div style={{ flex: 1, height: 18, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
-                                    <div style={{
-                                      height: '100%', width: `${pct}%`,
-                                      background: CHANNEL_COLORS[selectedChannel] || '#4facfe',
-                                      borderRadius: 4, display: 'flex', alignItems: 'center',
-                                      minWidth: d.count > 0 ? 24 : 0
-                                    }} />
-                                  </div>
-                                  <div style={{ fontSize: 12, fontWeight: 700, color: '#555', minWidth: 28, textAlign: 'right' }}>
-                                    {d.count}
-                                  </div>
-                                </div>
-                              )
-                            })
-                          })()}
-                        </div>
-                      )}
-                    </>
-                  )}
+                <div className="ch-detail-side">
+                  <DetailPanel {...detailPanelProps} isInline={false} />
                 </div>
               )}
             </div>
