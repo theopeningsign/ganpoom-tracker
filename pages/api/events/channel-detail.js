@@ -82,12 +82,13 @@ export default async function handler(req, res) {
       daily[day]++
     }
 
-    // 키워드 (견적 이벤트만) - 네이버: k_keyword, 구글: utm_term
-    if (QUOTE_EVENTS.includes(ev.event_category)) {
-      const kw = ev.k_keyword || ev.utm_term
-      if (kw) {
-        if (!keywords[kw]) keywords[kw] = { keyword: kw, count: 0, source: ev.k_keyword ? 'naver' : 'google' }
-        keywords[kw].count++
+    // 키워드 - 네이버: k_keyword, 구글: utm_term
+    const kw = ev.k_keyword || ev.utm_term
+    if (kw) {
+      if (!keywords[kw]) keywords[kw] = { keyword: kw, visits: 0, quotes: 0, source: ev.k_keyword ? 'naver' : 'google' }
+      keywords[kw].visits++
+      if (QUOTE_EVENTS.includes(ev.event_category)) {
+        keywords[kw].quotes++
       }
     }
   })
@@ -102,9 +103,9 @@ export default async function handler(req, res) {
     .sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ name, count }))
 
-  // 키워드 정렬
+  // 키워드 정렬 (견적 많은 순 → 방문 많은 순)
   const keywordList = Object.values(keywords)
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => b.quotes - a.quotes || b.visits - a.visits)
 
   return res.status(200).json({
     success: true,

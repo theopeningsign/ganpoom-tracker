@@ -495,12 +495,13 @@ export default function ChannelsPage() {
                           {detail.keywords.length === 0 ? (
                             <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>키워드 데이터 없음</div>
                           ) : (() => {
-                            const max = Math.max(...detail.keywords.map(k => k.count), 1)
-                            return detail.keywords.map((kw, i) => {
-                              const pct = (kw.count / max * 100).toFixed(1)
+                            const max = Math.max(...detail.keywords.map(k => k.visits), 1)
+                            return detail.keywords.map((kw) => {
+                              const pct = (kw.visits / max * 100).toFixed(1)
                               const isNaver = kw.source === 'naver'
+                              const convRate = kw.visits > 0 ? ((kw.quotes / kw.visits) * 100).toFixed(1) : '0.0'
                               return (
-                                <div key={kw.keyword} style={{ marginBottom: 12 }}>
+                                <div key={kw.keyword} style={{ marginBottom: 14 }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                       <span style={{
@@ -510,7 +511,14 @@ export default function ChannelsPage() {
                                       }}>{isNaver ? 'N' : 'G'}</span>
                                       <span style={{ color: '#333', fontWeight: 500 }}>{kw.keyword}</span>
                                     </div>
-                                    <span style={{ fontWeight: 700, color: '#333' }}>{kw.count}건</span>
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                      <span style={{ fontSize: 11, color: '#888' }}>방문 {kw.visits}</span>
+                                      <span style={{ fontSize: 12, fontWeight: 700, color: '#333' }}>견적 {kw.quotes}건</span>
+                                      <span style={{
+                                        fontSize: 11, fontWeight: 700,
+                                        color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c'
+                                      }}>{convRate}%</span>
+                                    </div>
                                   </div>
                                   <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
                                     <div style={{
