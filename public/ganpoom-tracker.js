@@ -85,7 +85,9 @@
       const mobile = ios || android || /Mobi/i.test(ua);
 
       // WebView 감지 (ganpoom 앱 = WebView로 감싼 구조)
+      const isGanpoomApp = /IOS_KEY:APP/i.test(ua);  // 간품 iOS 앱 Custom UA
       const isWebView =
+        isGanpoomApp ||                              // 간품 iOS 앱 (IOS_KEY:APP_{countryCode})
         /wv\b/.test(ua) ||                          // Android WebView
         /FBAN|FBAV/.test(ua) ||                     // 페이스북 인앱
         (ios && !/Safari/.test(ua) && /AppleWebKit/.test(ua)) || // iOS WebView (Safari 없음)
