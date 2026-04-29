@@ -18,7 +18,7 @@
         const scripts = document.getElementsByTagName('script');
         for (let i = 0; i < scripts.length; i++) {
           const src = scripts[i].src;
-          if (src && src.includes('gp.js')) {
+          if (src && src.includes('/gp.js')) {
             try { return new URL(src).origin + '/api'; } catch (_) {}
           }
         }
@@ -88,13 +88,6 @@
       const isGanpoomApp =
         /IOS_KEY:APP/i.test(ua) ||    // 간품 iOS 앱 Custom UA
         /간판의 품격/.test(ua);         // 간품 Android 앱 Custom UA
-      const isWebView =
-        isGanpoomApp ||                              // 간품 iOS/Android 앱
-        /wv\b/.test(ua) ||                          // Android WebView
-        /FBAN|FBAV/.test(ua) ||                     // 페이스북 인앱
-        (ios && !/Safari/.test(ua) && /AppleWebKit/.test(ua)) || // iOS WebView (Safari 없음)
-        (android && /Version\/\d/.test(ua) && !/Chrome/.test(ua)); // Android 구형 WebView
-
       return {
         device_type: mobile ? 'mobile' : 'desktop',
         os_name: ios ? 'iOS' : android ? 'Android' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'macOS' : 'unknown',
@@ -130,7 +123,8 @@
     function sendNow(eventCategory, extra) {
       try {
         const attrRaw = Cookie.get(CONFIG.attrKey);
-        const attr = attrRaw ? JSON.parse(attrRaw) : {};
+        let attr = {};
+        try { if (attrRaw) attr = JSON.parse(attrRaw); } catch(_) {}
         const device = getDeviceInfo();
         const payload = {
           event_category: eventCategory,
