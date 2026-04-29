@@ -5,7 +5,7 @@ import PasswordProtection from '../components/PasswordProtection'
 const CHANNEL_LABELS = {
   'naver.searchad': 'N(link)',
   'naver_powercontents': 'N(pwc)',
-  'google': '구글 광고',
+  'google': '구글광고',
   'tenping_web': '텐핑',
   'agency': 'CPA',
   'naver_blog_official': 'N(blog)',
