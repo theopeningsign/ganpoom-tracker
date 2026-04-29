@@ -3,7 +3,7 @@
  * 에어브릿지 대체 - 채널 어트리뷰션 + 전환 추적
  *
  * 사용법:
- * <script src="https://[tracker-domain]/ganpoom-tracker.js" async></script>
+ * <script src="https://[tracker-domain]/gp.js" async></script>
  */
 
 (function () {
@@ -18,7 +18,7 @@
         const scripts = document.getElementsByTagName('script');
         for (let i = 0; i < scripts.length; i++) {
           const src = scripts[i].src;
-          if (src && src.includes('ganpoom-tracker')) {
+          if (src && src.includes('gp.js')) {
             try { return new URL(src).origin + '/api'; } catch (_) {}
           }
         }

@@ -5,7 +5,7 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/ganpoom-tracker.js',
+        source: '/gp.js',
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
