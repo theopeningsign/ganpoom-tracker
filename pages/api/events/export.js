@@ -10,10 +10,10 @@ export default async function handler(req, res) {
 
   const { startDate, endDate, platform, staging } = req.query
 
-  const start = startDate ? new Date(startDate) : (() => {
+  const start = startDate ? new Date(startDate + 'T00:00:00+09:00') : (() => {
     const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d
   })()
-  const end = endDate ? new Date(endDate + 'T23:59:59') : new Date()
+  const end = endDate ? new Date(endDate + 'T23:59:59.999+09:00') : new Date()
 
   let query = supabase
     .from('events')
