@@ -160,7 +160,7 @@
           ...extra,
         };
         log('send', eventCategory, payload);
-        fetch(CONFIG.apiEndpoint + '/events/track', {
+        fetch(CONFIG.apiEndpoint + '/events/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

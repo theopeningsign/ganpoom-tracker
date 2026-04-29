@@ -8,6 +8,10 @@ const nextConfig = {
         source: '/ganpoom-tracker.js',
         destination: '/gp.js',
       },
+      {
+        source: '/api/events/track',
+        destination: '/api/events/log',
+      },
     ]
   },
   async headers() {
