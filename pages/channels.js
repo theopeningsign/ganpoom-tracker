@@ -3,12 +3,12 @@ import Link from 'next/link'
 import PasswordProtection from '../components/PasswordProtection'
 
 const CHANNEL_LABELS = {
-  'naver.searchad': '네이버(link)',
-  'naver_powercontents': '네이버(pwc)',
+  'naver.searchad': 'N(link)',
+  'naver_powercontents': 'N(pwc)',
   'google': '구글 광고',
   'tenping_web': '텐핑',
   'agency': 'CPA',
-  'naver_blog_official': '네이버(blog)',
+  'naver_blog_official': 'N(blog)',
   'instagram_official': '인스타그램',
   'unattributed': '자연유입',
 }

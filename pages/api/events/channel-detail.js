@@ -68,16 +68,21 @@ export default async function handler(req, res) {
       if (!platforms[plt]) platforms[plt] = 0
       platforms[plt]++
 
-      const day = ev.created_at?.slice(0, 10)
-      if (day) {
+      // 일별 추이: KST 기준으로 날짜 계산
+      if (ev.created_at) {
+        const kstDate = new Date(new Date(ev.created_at).getTime() + 9 * 60 * 60 * 1000)
+        const day = kstDate.toISOString().slice(0, 10)
         if (!daily[day]) daily[day] = 0
         daily[day]++
       }
 
+      // 키워드: session.start만 방문으로 카운트 (견적 이벤트는 quotes만)
       const kw = ev.k_keyword || ev.utm_term
       if (kw) {
         if (!keywords[kw]) keywords[kw] = { keyword: kw, visits: 0, quotes: 0, source: ev.k_keyword ? 'naver' : 'google' }
-        keywords[kw].visits++
+        if (ev.event_category === 'session.start') {
+          keywords[kw].visits++
+        }
         if (QUOTE_EVENTS.includes(ev.event_category)) {
           keywords[kw].quotes++
         }
