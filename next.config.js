@@ -2,6 +2,14 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  async rewrites() {
+    return [
+      {
+        source: '/ganpoom-tracker.js',
+        destination: '/gp.js',
+      },
+    ]
+  },
   async headers() {
     return [
       {
