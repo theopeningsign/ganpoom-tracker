@@ -10,7 +10,7 @@ const PasswordProtection = ({ children }) => {
 
   useEffect(() => {
     // 세션 스토리지에서 인증 상태 확인
-    const authStatus = sessionStorage.getItem('ganpoom_admin_auth')
+    const authStatus = localStorage.getItem('ganpoom_admin_auth')
     if (authStatus === 'authenticated') {
       setIsAuthenticated(true)
     }
@@ -24,7 +24,7 @@ const PasswordProtection = ({ children }) => {
       setIsAuthenticated(true)
       setError('')
       // 세션 스토리지에 인증 상태 저장 (브라우저 닫으면 삭제됨)
-      sessionStorage.setItem('ganpoom_admin_auth', 'authenticated')
+      localStorage.setItem('ganpoom_admin_auth', 'authenticated')
     } else {
       setError('비밀번호가 틀렸습니다.')
       setPassword('')
