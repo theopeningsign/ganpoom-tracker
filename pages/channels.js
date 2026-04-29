@@ -511,13 +511,15 @@ export default function ChannelsPage() {
                 ))}
               </div>
 
-              <input type="date" value={dates.startDate}
-                onChange={e => { setDates(p => ({ ...p, startDate: e.target.value })); setActivePreset('') }}
-                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
-              <span style={{ color: '#888' }}>~</span>
-              <input type="date" value={dates.endDate}
-                onChange={e => { setDates(p => ({ ...p, endDate: e.target.value })); setActivePreset('') }}
-                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="date" value={dates.startDate}
+                  onChange={e => { setDates(p => ({ ...p, startDate: e.target.value })); setActivePreset('') }}
+                  style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+                <span style={{ color: '#888' }}>~</span>
+                <input type="date" value={dates.endDate}
+                  onChange={e => { setDates(p => ({ ...p, endDate: e.target.value })); setActivePreset('') }}
+                  style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
+              </div>
 
               <button onClick={fetchStats} style={{
                 padding: '8px 16px', borderRadius: 8, border: 'none',
