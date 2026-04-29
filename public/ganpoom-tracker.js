@@ -98,7 +98,7 @@
       return {
         device_type: mobile ? 'mobile' : 'desktop',
         os_name: ios ? 'iOS' : android ? 'Android' : /Windows/i.test(ua) ? 'Windows' : /Mac/i.test(ua) ? 'macOS' : 'unknown',
-        platform: isWebView ? 'app' : 'web',  // WebView면 app으로 자동 설정
+        platform: isGanpoomApp ? 'app' : 'web',  // 간품 앱 UA일 때만 app (카카오톡 인앱 등 오분류 방지)
       };
     }
 
