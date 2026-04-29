@@ -112,10 +112,11 @@ export default async function handler(req, res) {
     deviceMap[key] = (deviceMap[key] || 0) + 1
   })
 
-  // 일별 추이 (견적 기준)
+  // 일별 추이 (견적 기준, KST 기준으로 날짜 계산)
   const dailyMap = {}
   events.forEach(e => {
-    const day = e.created_at.slice(0, 10)
+    const kstDate = new Date(new Date(e.created_at).getTime() + 9 * 60 * 60 * 1000)
+    const day = kstDate.toISOString().slice(0, 10)
     if (!dailyMap[day]) dailyMap[day] = { date: day, total: 0 }
     dailyMap[day].total++
   })
