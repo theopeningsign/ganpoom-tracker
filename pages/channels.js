@@ -332,6 +332,7 @@ export default function ChannelsPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showStaging, setShowStaging] = useState(false)
+  const [adCosts, setAdCosts] = useState({}) // { 'event_channel': amount }
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [detail, setDetail] = useState(null)
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -368,7 +369,40 @@ export default function ChannelsPage() {
     }
   }, [dates, platform])
 
+  // ad_costs 채널 키 → events 채널 키 매핑
+  const ADCOST_TO_CH = {
+    'naver_search':  'naver.searchad',
+    'naver_power':   'naver_powercontents',
+    'google_app':    'google.adwords',
+    'google':        'google',
+    'tenping':       'tenping_web',
+  }
+
+  const fetchAdCosts = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate })
+      const res = await fetch(`/api/adcosts?${params}`)
+      const json = await res.json()
+      if (json.success && json.totals) {
+        // 텐핑은 VAT 1.1 적용, 나머지 그대로
+        const mapped = {}
+        Object.entries(json.totals).forEach(([adKey, amount]) => {
+          const evCh = ADCOST_TO_CH[adKey]
+          if (evCh && amount > 0) {
+            mapped[evCh] = adKey === 'tenping' ? Math.round(amount * 1.1) : amount
+          }
+        })
+        setAdCosts(mapped)
+      } else {
+        setAdCosts({})
+      }
+    } catch (e) {
+      setAdCosts({})
+    }
+  }, [dates])
+
   useEffect(() => { fetchStats() }, [fetchStats])
+  useEffect(() => { fetchAdCosts() }, [fetchAdCosts])
 
   useEffect(() => {
     if (selectedChannel) {
@@ -427,15 +461,26 @@ export default function ChannelsPage() {
           padding: '0 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
         }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>📡 채널 분석</div>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(255,255,255,0.1)', borderRadius: 20,
-              padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
-            }}>
-              <span>📊</span><span>대시보드</span>
-            </div>
-          </Link>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Link href="/" style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'rgba(255,255,255,0.1)', borderRadius: 20,
+                padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
+              }}>
+                <span>📊</span><span>대시보드</span>
+              </div>
+            </Link>
+            <Link href="/adcosts" style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'rgba(255,255,255,0.1)', borderRadius: 20,
+                padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
+              }}>
+                <span>💸</span><span>광고비</span>
+              </div>
+            </Link>
+          </div>
         </div>
 
         {/* 사이드바 */}
@@ -452,6 +497,7 @@ export default function ChannelsPage() {
             {[
               { href: '/', label: '대시보드', icon: '📊' },
               { href: '/channels', label: '채널 분석', icon: '📡' },
+              { href: '/adcosts', label: '광고비 입력', icon: '💸' },
               { href: '/admin/agents', label: 'CPA 에이전트', icon: '👥' },
               { href: '/admin/settlement', label: '정산 관리', icon: '💰' },
             ].map(({ href, label, icon }) => (
@@ -624,6 +670,39 @@ export default function ChannelsPage() {
                           </div>
                         )}
                       </div>
+
+                        {/* 광고비 분석 (광고비 데이터 있는 채널만) */}
+                        {adCosts[ch.channel] > 0 && (
+                          <div style={{
+                            marginTop: 12, padding: '10px 14px',
+                            background: '#f8f9ff', borderRadius: 8,
+                            display: 'flex', gap: 24, flexWrap: 'wrap',
+                            borderLeft: `3px solid ${color}`,
+                          }}>
+                            <div>
+                              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>광고비</div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: '#333' }}>
+                                {adCosts[ch.channel].toLocaleString()}원
+                              </div>
+                            </div>
+                            {ch.count > 0 && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>CPA (견적당)</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#e74c3c' }}>
+                                  {Math.round(adCosts[ch.channel] / ch.count).toLocaleString()}원
+                                </div>
+                              </div>
+                            )}
+                            {ch.sessions > 0 && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>CPV (방문당)</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#9b59b6' }}>
+                                  {Math.round(adCosts[ch.channel] / ch.sessions).toLocaleString()}원
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                       {/* 모바일 전용 인라인 상세패널 (카드 바로 아래) */}
                       {isSelected && (
