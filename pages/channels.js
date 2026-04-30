@@ -461,26 +461,15 @@ export default function ChannelsPage() {
           padding: '0 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
         }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>📡 채널 분석</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Link href="/" style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'rgba(255,255,255,0.1)', borderRadius: 20,
-                padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
-              }}>
-                <span>📊</span><span>대시보드</span>
-              </div>
-            </Link>
-            <Link href="/adcosts" style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'rgba(255,255,255,0.1)', borderRadius: 20,
-                padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
-              }}>
-                <span>💸</span><span>광고비</span>
-              </div>
-            </Link>
-          </div>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(255,255,255,0.1)', borderRadius: 20,
+              padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
+            }}>
+              <span>📊</span><span>대시보드</span>
+            </div>
+          </Link>
         </div>
 
         {/* 사이드바 */}
