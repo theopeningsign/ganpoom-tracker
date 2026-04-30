@@ -372,33 +372,61 @@ export default function ChannelsPage() {
 
   const downloadExcel = useCallback(() => {
     if (!data) return
-    const rows = data.channelStats.map(ch => {
-      const label = CHANNEL_LABELS[ch.channel] || ch.channel
-      const convRate = ch.sessions > 0 ? parseFloat(((ch.count / ch.sessions) * 100).toFixed(1)) : null
+
+    // 엑셀용 채널 전체 이름 (축약 없이)
+    const CHANNEL_FULL = {
+      'naver.searchad':      '네이버 검색광고',
+      'naver_powercontents': '네이버 파워컨텐츠',
+      'google':              '구글광고',
+      'google.adwords':      '구글 앱광고',
+      'tenping_web':         '텐핑',
+      'tenping':             '텐핑 (구)',
+      'agency':              'CPA 에이전트',
+      'naver_blog_official': '네이버 블로그',
+      'instagram_official':  '인스타그램',
+      'unattributed':        '자연유입',
+    }
+
+    // 광고비 있는 채널이 하나라도 있으면 광고비 컬럼 추가
+    const hasAdCost = data.channelStats.some(ch => (adCosts[ch.channel] || 0) > 0)
+
+    const headers = ['채널', '방문수', '견적요청수', '전환율(%)']
+    if (hasAdCost) headers.push('광고비(원)', 'CPA — 견적당(원)', 'CPV — 방문당(원)')
+
+    const colCount = headers.length
+    const sd = dates.startDate.replace(/-/g, '')
+    const ed = dates.endDate.replace(/-/g, '')
+    const title = `간판의품격 채널분석 ( ${sd} - ${ed} )`
+
+    const dataRows = data.channelStats.map(ch => {
+      const label = CHANNEL_FULL[ch.channel] || ch.channel
+      const convRate = ch.sessions > 0 ? parseFloat(((ch.count / ch.sessions) * 100).toFixed(1)) : '-'
       const cost = adCosts[ch.channel] || 0
-      const row = {
-        '채널': label,
-        '방문수': ch.sessions || 0,
-        '견적요청수': ch.count,
-        '전환율(%)': convRate !== null ? convRate : '-',
-      }
-      if (cost > 0) {
-        row['광고비(원)'] = cost
-        row['CPA — 견적당(원)'] = ch.count > 0 ? Math.round(cost / ch.count) : '-'
-        row['CPV — 방문당(원)'] = ch.sessions > 0 ? Math.round(cost / ch.sessions) : '-'
+      const row = [label, ch.sessions || 0, ch.count, convRate]
+      if (hasAdCost) {
+        row.push(
+          cost > 0 ? cost : '-',
+          cost > 0 && ch.count > 0 ? Math.round(cost / ch.count) : '-',
+          cost > 0 && ch.sessions > 0 ? Math.round(cost / ch.sessions) : '-',
+        )
       }
       return row
     })
 
-    const ws = XLSX.utils.json_to_sheet(rows)
+    // AOA 방식: 1행 제목, 2행 헤더, 3행~ 데이터
+    const aoa = [[title], headers, ...dataRows]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+    // 제목 행 셀 병합 (A1 ~ 마지막 컬럼)
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } }]
+
+    // 컬럼 너비
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 14) }))
+
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '채널분석')
 
-    // 컬럼 너비 자동 조정
-    const cols = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length * 2, 12) }))
-    ws['!cols'] = cols
-
-    const fileName = `채널분석_${dates.startDate}_${dates.endDate}.xlsx`
+    const fileName = `채널분석_${sd}_${ed}.xlsx`
     XLSX.writeFile(wb, fileName)
   }, [data, adCosts, dates])
 
