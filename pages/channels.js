@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import PasswordProtection from '../components/PasswordProtection'
+import * as XLSX from 'xlsx'
 
 const CHANNEL_LABELS = {
   'naver.searchad': 'N(link)',
@@ -369,6 +370,38 @@ export default function ChannelsPage() {
     }
   }, [dates, platform])
 
+  const downloadExcel = useCallback(() => {
+    if (!data) return
+    const rows = data.channelStats.map(ch => {
+      const label = CHANNEL_LABELS[ch.channel] || ch.channel
+      const convRate = ch.sessions > 0 ? parseFloat(((ch.count / ch.sessions) * 100).toFixed(1)) : null
+      const cost = adCosts[ch.channel] || 0
+      const row = {
+        '채널': label,
+        '방문수': ch.sessions || 0,
+        '견적요청수': ch.count,
+        '전환율(%)': convRate !== null ? convRate : '-',
+      }
+      if (cost > 0) {
+        row['광고비(원)'] = cost
+        row['CPA — 견적당(원)'] = ch.count > 0 ? Math.round(cost / ch.count) : '-'
+        row['CPV — 방문당(원)'] = ch.sessions > 0 ? Math.round(cost / ch.sessions) : '-'
+      }
+      return row
+    })
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '채널분석')
+
+    // 컬럼 너비 자동 조정
+    const cols = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length * 2, 12) }))
+    ws['!cols'] = cols
+
+    const fileName = `채널분석_${dates.startDate}_${dates.endDate}.xlsx`
+    XLSX.writeFile(wb, fileName)
+  }, [data, adCosts, dates])
+
   // ad_costs 채널 키 → events 채널 키 매핑
   const ADCOST_TO_CH = {
     'naver_search':  'naver.searchad',
@@ -560,6 +593,13 @@ export default function ChannelsPage() {
                 padding: '8px 16px', borderRadius: 8, border: 'none',
                 background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600
               }}>조회</button>
+
+              <button onClick={downloadExcel} disabled={!data} style={{
+                padding: '8px 14px', borderRadius: 8, border: '1px solid #52c41a',
+                background: data ? '#f6ffed' : '#f5f5f5', color: data ? '#52c41a' : '#ccc',
+                fontSize: 13, cursor: data ? 'pointer' : 'default', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 5
+              }}>📥 엑셀</button>
             </div>
           </div>
 
