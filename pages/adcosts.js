@@ -29,6 +29,7 @@ export default function AdCosts() {
   const [editing, setEditing] = useState({})   // { 'YYYY-MM-DD|channel': string } raw input while editing
   const [saveStatus, setSaveStatus] = useState('')
   const [loading, setLoading] = useState(false)
+  const [focusedKey, setFocusedKey] = useState(null)
   const cellRefs = useRef({})
   const saveTimer = useRef(null)
 
@@ -88,6 +89,7 @@ export default function AdCosts() {
 
   const handleFocus = (date, ch) => {
     const key = `${date}|${ch}`
+    setFocusedKey(key)
     setEditing(prev => ({ ...prev, [key]: String(costs[key] || '') }))
   }
 
@@ -104,6 +106,7 @@ export default function AdCosts() {
 
     setCosts(prev => ({ ...prev, [key]: amount }))
     setEditing(prev => { const next = { ...prev }; delete next[key]; return next })
+    setFocusedKey(null)
 
     // 저장
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -216,9 +219,16 @@ export default function AdCosts() {
                         {CHANNELS.map((ch, colIdx) => {
                           const key = `${date}|${ch.key}`
                           const isEditing = key in editing
+                          const isFocused = focusedKey === key
                           const displayVal = isEditing ? editing[key] : (getVal(date, ch.key) || '')
                           return (
-                            <td key={ch.key} style={s.td}>
+                            <td key={ch.key} style={{
+                              ...s.td,
+                              background: isFocused ? 'rgba(99,179,237,0.15)' : 'transparent',
+                              outline: isFocused ? '2px solid #63b3ed' : 'none',
+                              outlineOffset: '-2px',
+                              borderRadius: isFocused ? 4 : 0,
+                            }}>
                               <input
                                 ref={el => { cellRefs.current[`${rowIdx}-${colIdx}`] = el }}
                                 value={isEditing ? displayVal : (displayVal ? fmt(displayVal) : '')}
