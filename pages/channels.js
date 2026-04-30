@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import PasswordProtection from '../components/PasswordProtection'
 import * as XLSX from 'xlsx'
@@ -7,12 +7,25 @@ const CHANNEL_LABELS = {
   'naver.searchad': 'N(link)',
   'naver_powercontents': 'N(pwc)',
   'google': '구글광고',
+  'google.adwords': 'G(앱)',
   'tenping_web': '텐핑',
   'agency': 'CPA',
   'naver_blog_official': 'N(blog)',
   'instagram_official': '인스타그램',
   'unattributed': '자연유입',
 }
+
+// 항상 표시할 채널 목록 (데이터 없어도 카드 노출)
+const PREDEFINED_CHANNELS = [
+  { channel: 'naver.searchad',      channel_type: 'paid' },
+  { channel: 'naver_powercontents', channel_type: 'paid' },
+  { channel: 'google',              channel_type: 'paid' },
+  { channel: 'google.adwords',      channel_type: 'paid' },
+  { channel: 'tenping_web',         channel_type: 'paid' },
+  { channel: 'agency',              channel_type: 'cpa' },
+  { channel: 'naver_blog_official', channel_type: 'organic' },
+  { channel: 'unattributed',        channel_type: 'organic' },
+]
 
 const CHANNEL_COLORS = {
   'naver.searchad': '#03C75A',
@@ -370,6 +383,20 @@ export default function ChannelsPage() {
     }
   }, [dates, platform])
 
+  // API 데이터 + 미리 정의된 채널 병합 (데이터 없어도 항상 노출)
+  const displayChannels = useMemo(() => {
+    if (!data) return []
+    const existing = new Map(data.channelStats.map(c => [c.channel, c]))
+    const extra = PREDEFINED_CHANNELS
+      .filter(c => !existing.has(c.channel))
+      .map(c => ({ ...c, count: 0, sessions: 0, conversionRate: null }))
+    // 실데이터 채널 먼저, 그 다음 광고비 있는 빈 채널, 마지막 광고비 없는 빈 채널
+    return [
+      ...data.channelStats,
+      ...extra.sort((a, b) => (adCosts[b.channel] || 0) - (adCosts[a.channel] || 0)),
+    ]
+  }, [data, adCosts])
+
   const downloadExcel = useCallback(() => {
     if (!data) return
 
@@ -388,7 +415,7 @@ export default function ChannelsPage() {
     }
 
     // 광고비 있는 채널이 하나라도 있으면 광고비 컬럼 추가
-    const hasAdCost = data.channelStats.some(ch => (adCosts[ch.channel] || 0) > 0)
+    const hasAdCost = displayChannels.some(ch => (adCosts[ch.channel] || 0) > 0)
 
     const headers = ['채널', '방문수', '견적요청수', '전환율(%)']
     if (hasAdCost) headers.push('광고비(원)', 'CPA — 견적당(원)', 'CPV — 방문당(원)')
@@ -398,7 +425,7 @@ export default function ChannelsPage() {
     const ed = dates.endDate.replace(/-/g, '')
     const title = `간판의품격 채널분석 ( ${sd} - ${ed} )`
 
-    const dataRows = data.channelStats.map(ch => {
+    const dataRows = displayChannels.map(ch => {
       const label = CHANNEL_FULL[ch.channel] || ch.channel
       const convRate = ch.sessions > 0 ? parseFloat(((ch.count / ch.sessions) * 100).toFixed(1)) : '-'
       const cost = adCosts[ch.channel] || 0
@@ -428,7 +455,7 @@ export default function ChannelsPage() {
 
     const fileName = `채널분석_${sd}_${ed}.xlsx`
     XLSX.writeFile(wb, fileName)
-  }, [data, adCosts, dates])
+  }, [data, adCosts, dates, displayChannels])
 
   // ad_costs 채널 키 → events 채널 키 매핑
   const ADCOST_TO_CH = {
@@ -483,8 +510,8 @@ export default function ChannelsPage() {
     }
   }, [selectedChannel])
 
-  const selectedData = selectedChannel && data
-    ? data.channelStats.find(c => c.channel === selectedChannel)
+  const selectedData = selectedChannel
+    ? displayChannels.find(c => c.channel === selectedChannel)
     : null
 
   const detailPanelProps = { selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent }
@@ -640,7 +667,7 @@ export default function ChannelsPage() {
 
               {/* 채널 카드 목록 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {data.channelStats.length === 0 ? (
+                {displayChannels.length === 0 ? (
                   <div style={{
                     background: 'white', borderRadius: 12, padding: 60,
                     textAlign: 'center', color: '#bbb', fontSize: 14,
@@ -648,7 +675,7 @@ export default function ChannelsPage() {
                   }}>
                     선택한 기간에 데이터가 없습니다
                   </div>
-                ) : data.channelStats.map(ch => {
+                ) : displayChannels.map(ch => {
                   const badge = TYPE_BADGE[ch.channel_type] || TYPE_BADGE.organic
                   const pct = data.summary.total > 0 ? ((ch.count / data.summary.total) * 100).toFixed(1) : '0.0'
                   const color = CHANNEL_COLORS[ch.channel] || '#bbb'
