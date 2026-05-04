@@ -15,24 +15,35 @@ export default async function handler(req, res) {
   })()
   const end = endDate ? new Date(endDate + 'T23:59:59.999+09:00') : new Date()
 
-  let query = supabase
-    .from('events')
-    .select('*')
-    .gte('created_at', start.toISOString())
-    .lte('created_at', end.toISOString())
-    .order('created_at', { ascending: false })
+  // Supabase 기본 limit이 1000행이라 페이지네이션으로 전체 데이터 조회
+  const PAGE_SIZE = 1000
+  let allEvents = []
+  let page = 0
 
-  if (platform && platform !== 'all') query = query.eq('platform', platform)
+  while (true) {
+    let query = supabase
+      .from('events')
+      .select('*')
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
+      .order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
-  if (staging === 'true') {
-    query = query.eq('is_staging', true)
-  } else {
-    query = query.eq('is_staging', false)
+    if (platform && platform !== 'all') query = query.eq('platform', platform)
+
+    if (staging === 'true') {
+      query = query.eq('is_staging', true)
+    } else {
+      query = query.eq('is_staging', false)
+    }
+
+    const { data, error } = await query
+    if (error) return res.status(500).json({ success: false, error: error.message })
+
+    allEvents = allEvents.concat(data || [])
+    if (!data || data.length < PAGE_SIZE) break
+    page++
   }
 
-  const { data: events, error } = await query
-
-  if (error) return res.status(500).json({ success: false, error: error.message })
-
-  return res.status(200).json({ success: true, events: events || [] })
+  return res.status(200).json({ success: true, events: allEvents })
 }

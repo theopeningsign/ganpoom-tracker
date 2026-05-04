@@ -16,25 +16,36 @@ export default async function handler(req, res) {
   })()
   const end = endDate ? new Date(endDate + 'T23:59:59.999+09:00') : new Date()
 
-  let baseQuery = supabase
-    .from('events')
-    .select('*')
-    .gte('created_at', start.toISOString())
-    .lte('created_at', end.toISOString())
+  // Supabase 기본 limit이 1000행이라 페이지네이션으로 전체 데이터 조회
+  const PAGE_SIZE = 1000
+  let allEvents = []
+  let page = 0
 
-  if (platform && platform !== 'all') baseQuery = baseQuery.eq('platform', platform)
+  while (true) {
+    let q = supabase
+      .from('events')
+      .select('*')
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
-  if (staging === 'true') {
-    baseQuery = baseQuery.eq('is_staging', true)
-  } else {
-    baseQuery = baseQuery.eq('is_staging', false)
-  }
+    if (platform && platform !== 'all') q = q.eq('platform', platform)
 
-  const { data: allEvents, error } = await baseQuery
+    if (staging === 'true') {
+      q = q.eq('is_staging', true)
+    } else {
+      q = q.eq('is_staging', false)
+    }
 
-  if (error) {
-    console.error('stats error:', error)
-    return res.status(500).json({ success: false, error: error.message })
+    const { data, error } = await q
+    if (error) {
+      console.error('stats error:', error)
+      return res.status(500).json({ success: false, error: error.message })
+    }
+
+    allEvents = allEvents.concat(data || [])
+    if (!data || data.length < PAGE_SIZE) break
+    page++
   }
 
   // 견적요청 이벤트만 필터

@@ -37,12 +37,19 @@ export default async function handler(req, res) {
 
     if (recentError) console.error('recentEvents error:', recentError)
 
-    // 전체 이벤트 집계
-    const { data: allEvents, error: allError } = await applyFilters(
-      supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term')
-    )
-
-    if (allError) console.error('allEvents error:', allError)
+    // 전체 이벤트 집계 (페이지네이션으로 1000행 제한 우회)
+    const PAGE_SIZE = 1000
+    let allEvents = []
+    let pg = 0
+    while (true) {
+      const { data: pageData, error: pageError } = await applyFilters(
+        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term')
+      ).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
+      if (pageError) { console.error('allEvents error:', pageError); break }
+      allEvents = allEvents.concat(pageData || [])
+      if (!pageData || pageData.length < PAGE_SIZE) break
+      pg++
+    }
 
     const campaigns = {}
     const categories = {}

@@ -22,8 +22,18 @@ export default async function handler(req, res) {
     if (platform && platform !== 'all') query = query.eq('platform', platform)
     if (staging !== 'true') query = query.or('is_staging.is.null,is_staging.eq.false')
 
-    const { data, error } = await query
-    if (error) throw error
+    // 페이지네이션으로 1000행 제한 우회
+    const PAGE_SIZE = 1000
+    let allData = []
+    let pg = 0
+    while (true) {
+      const { data: pageData, error } = await query.range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
+      if (error) throw error
+      allData = allData.concat(pageData || [])
+      if (!pageData || pageData.length < PAGE_SIZE) break
+      pg++
+    }
+    const data = allData
 
     // 채널별 집계
     const channelMap = {}
