@@ -78,6 +78,17 @@ const CATEGORY_LABELS = {
   'airbridge.ecommerce.order.completed': '스타일시공 요청',
 }
 
+function fmtDatetime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${y}-${mo}-${day} ${h}:${mi}`
+}
+
 function toYMD(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -226,7 +237,7 @@ export default function Dashboard() {
       const header = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Platform', 'Client IP City']
       const rows = json.events.map(e => ({
         'Event Category': e.event_category || '',
-        'Event Datetime': e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
+        'Event Datetime': fmtDatetime(e.created_at),
         'Channel': e.channel || 'unattributed',
         'Campaign': e.campaign || '',
         'Platform': e.device_type === 'mobile' ? (e.os_name || 'Mobile') : 'Desktop',
@@ -251,11 +262,9 @@ export default function Dashboard() {
       if (!json.success) return
       const CPA_HEADERS = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Ad Group', 'Ad Creative', 'Browser Referrer', 'Device Type', 'OS Name', 'Client IP', 'Client IP City', 'Client IP Subdivision']
       const cpaRows = json.events.map(e => {
-        const dt = e.created_at ? new Date(new Date(e.created_at).getTime() + 9 * 60 * 60 * 1000)
-          .toISOString().replace('Z', '+09:00') : ''
         return [
           formatEventCategory(e.event_category, e.platform),
-          dt,
+          fmtDatetime(e.created_at),
           e.channel || 'unattributed',
           e.campaign || e.utm_campaign || '',
           e.ad_group || '',
@@ -290,7 +299,7 @@ export default function Dashboard() {
         .filter(e => QUOTE_EVENTS.includes(e.event_category))
         .map(e => ([
           formatEventCategory(e.event_category, e.platform),
-          e.created_at ? new Date(e.created_at).toLocaleString('ko-KR') : '',
+          fmtDatetime(e.created_at),
           e.channel || 'unattributed',
           e.campaign || e.utm_campaign || '',
           e.os_name || (e.device_type === 'mobile' ? 'Mobile' : 'Desktop'),
