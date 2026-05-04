@@ -89,6 +89,14 @@ function fmtDatetime(iso) {
   return `${y}-${mo}-${day} ${h}:${mi}`
 }
 
+// Excel 진짜 날짜값으로 내보내기 (텍스트 나누기 없이 바로 인식)
+// SheetJS는 UTC 기준으로 직렬화하므로 KST(+9h) 보정
+function toExcelDate(iso) {
+  if (!iso) return ''
+  const kst = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000)
+  return { t: 'd', v: kst, z: 'yyyy-mm-dd hh:mm' }
+}
+
 function toYMD(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -237,7 +245,7 @@ export default function Dashboard() {
       const header = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Platform', 'Client IP City']
       const rows = json.events.map(e => ({
         'Event Category': e.event_category || '',
-        'Event Datetime': fmtDatetime(e.created_at),
+        'Event Datetime': toExcelDate(e.created_at),
         'Channel': e.channel || 'unattributed',
         'Campaign': e.campaign || '',
         'Platform': e.device_type === 'mobile' ? (e.os_name || 'Mobile') : 'Desktop',
@@ -264,7 +272,7 @@ export default function Dashboard() {
       const cpaRows = json.events.map(e => {
         return [
           formatEventCategory(e.event_category, e.platform),
-          fmtDatetime(e.created_at),
+          toExcelDate(e.created_at),
           e.channel || 'unattributed',
           e.campaign || e.utm_campaign || '',
           e.ad_group || '',
@@ -299,7 +307,7 @@ export default function Dashboard() {
         .filter(e => QUOTE_EVENTS.includes(e.event_category))
         .map(e => ([
           formatEventCategory(e.event_category, e.platform),
-          fmtDatetime(e.created_at),
+          toExcelDate(e.created_at),
           e.channel || 'unattributed',
           e.campaign || e.utm_campaign || '',
           e.os_name || (e.device_type === 'mobile' ? 'Mobile' : 'Desktop'),
