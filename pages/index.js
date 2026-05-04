@@ -200,7 +200,8 @@ const DATE_PRESETS = [
 ]
 
 export default function Dashboard() {
-  const [dates, setDates] = useState(getDefaultDates)
+  const [dates, setDates] = useState(getDefaultDates)       // 실제 조회 기간
+  const [inputDates, setInputDates] = useState(getDefaultDates) // 날짜 input 표시값
   const [activePreset, setActivePreset] = useState('today')
   const [platform, setPlatform] = useState('all')
   const [showStaging, setShowStaging] = useState(false)
@@ -461,12 +462,13 @@ export default function Dashboard() {
                 <option value="app">앱</option>
               </select>
 
-              {/* 기간 프리셋 버튼 */}
+              {/* 기간 프리셋 버튼 — 누르면 즉시 조회 */}
               <div style={{ display: 'flex', gap: 4, background: '#f0f2f5', borderRadius: 8, padding: 3 }}>
                 {DATE_PRESETS.map(({ key, label }) => (
                   <button key={key} onClick={() => {
                     const range = getDateRange(key)
                     setDates(range)
+                    setInputDates(range)
                     setActivePreset(key)
                   }} style={{
                     padding: '6px 12px', borderRadius: 6, border: 'none', fontSize: 12,
@@ -479,16 +481,16 @@ export default function Dashboard() {
                 ))}
               </div>
 
-              {/* 직접 날짜 입력 */}
-              <input type="date" value={dates.startDate}
-                onChange={e => { setDates(p => ({ ...p, startDate: e.target.value })); setActivePreset('') }}
+              {/* 직접 날짜 입력 — inputDates만 업데이트, 조회 버튼 눌러야 반영 */}
+              <input type="date" value={inputDates.startDate}
+                onChange={e => { setInputDates(p => ({ ...p, startDate: e.target.value })); setActivePreset('') }}
                 style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
               <span style={{ color: '#888' }}>~</span>
-              <input type="date" value={dates.endDate}
-                onChange={e => { setDates(p => ({ ...p, endDate: e.target.value })); setActivePreset('') }}
+              <input type="date" value={inputDates.endDate}
+                onChange={e => { setInputDates(p => ({ ...p, endDate: e.target.value })); setActivePreset('') }}
                 style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
 
-              <button onClick={fetchStats}
+              <button onClick={() => setDates({ ...inputDates })}
                 style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                 조회
               </button>
