@@ -70,8 +70,10 @@ export default function ReportPage() {
   const totalClicks = agentStats.reduce((s, a) => s + (a.clicks || 0), 0)
   const totalQuotes = agentStats.reduce((s, a) => s + (a.quotes || 0), 0)
 
-  // 견적요청 내림차순 정렬
-  const sorted = [...agentStats].sort((a, b) => (b.quotes || 0) - (a.quotes || 0))
+  // 실적 있는 에이전트만, 견적요청 내림차순 정렬
+  const sorted = [...agentStats]
+    .filter(a => (a.clicks || 0) > 0 || (a.quotes || 0) > 0)
+    .sort((a, b) => (b.quotes || 0) - (a.quotes || 0))
 
   return (
     <>
