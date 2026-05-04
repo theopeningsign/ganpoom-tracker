@@ -98,11 +98,10 @@ function fmtDatetime(iso) {
 }
 
 // Excel 진짜 날짜값으로 내보내기 (텍스트 나누기 없이 바로 인식)
-// SheetJS는 UTC 기준으로 직렬화하므로 KST(+9h) 보정
+// SheetJS는 로컬 시간(KST) 기준으로 직렬화하므로 추가 보정 없이 그대로 전달
 function toExcelDate(iso) {
   if (!iso) return ''
-  const kst = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000)
-  return { t: 'd', v: kst, z: 'yyyy-mm-dd hh:mm' }
+  return { t: 'd', v: new Date(iso), z: 'yyyy-mm-dd hh:mm' }
 }
 
 function toYMD(date) {
