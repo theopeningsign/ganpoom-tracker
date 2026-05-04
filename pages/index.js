@@ -78,6 +78,14 @@ const CATEGORY_LABELS = {
   'airbridge.ecommerce.order.completed': '스타일시공 요청',
 }
 
+// gp001 → CPA_01, gp024 → CPA_24
+function agentIdToCPA(agentId) {
+  if (!agentId) return ''
+  const num = parseInt(agentId.replace(/^gp/i, ''), 10)
+  if (isNaN(num)) return agentId
+  return 'CPA_' + String(num).padStart(2, '0')
+}
+
 function fmtDatetime(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -275,7 +283,7 @@ export default function Dashboard() {
           formatEventCategory(e.event_category, e.platform),
           toExcelDate(e.created_at),
           e.channel || 'unattributed',
-          e.campaign || e.utm_campaign || '',
+          e.channel === 'agency' ? agentIdToCPA(e.agent_id) : (e.campaign || e.utm_campaign || ''),
           e.ad_group || '',
           e.ad_creative || '',
           e.referrer || '',
