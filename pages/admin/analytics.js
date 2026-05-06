@@ -421,6 +421,18 @@ export default function AnalyticsPage() {
                 }}>👥 에이전트 관리</button>
               </Link>
               
+              <Link href="/admin/report" style={{ textDecoration: 'none' }}>
+                <button style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #0f1117 0%, #1a1d2e 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}>📸 실적 리포트</button>
+              </Link>
+
               <Link href="/admin/settlement" style={{ textDecoration: 'none' }}>
                 <button style={{
                   padding: '12px 24px',
