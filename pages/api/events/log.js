@@ -5,9 +5,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// 중복 차단 대상 이벤트 (견적요청)
-const QUOTE_EVENTS = new Set(['comparison.request', 'order.complete'])
-
 // 저장할 전환 이벤트 목록 (페이지뷰 제외)
 const ALLOWED_EVENTS = new Set([
   'session.start',
@@ -114,13 +111,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, skipped: true })
     }
 
-    // 중복 이벤트 방지: DB unique constraint 기반 (race condition 없음)
-    // 견적요청 이벤트만 dedup_key 부여 → 5초 내 동일 session+event 중복 차단
+    // 중복 이벤트 방지 (같은 session_id + event_category 5초 이내 재전송 차단)
     const sessionId = body.session_id || null
-    const eventKey = normalized || body.event_category || 'unknown'
-    const dedup_key = (sessionId && QUOTE_EVENTS.has(eventKey))
-      ? `${sessionId}:${eventKey}:${Math.floor(Date.now() / 5000)}`
-      : null
+    if (sessionId) {
+      const fiveSecsAgo = new Date(Date.now() - 5000).toISOString()
+      const { count } = await supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sessionId)
+        .eq('event_category', normalized || body.event_category || '')
+        .gte('created_at', fiveSecsAgo)
+      if (count > 0) {
+        return res.status(200).json({ success: true, skipped: true, reason: 'duplicate' })
+      }
+    }
 
     // IP 추출 (프록시/로드밸런서 고려)
     const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
@@ -174,15 +178,9 @@ export default async function handler(req, res) {
         (body.landing_page && body.landing_page.includes('staging')) ||
         (body.referrer && body.referrer.includes('staging'))
       ),
-
-      dedup_key,
     }
 
-    // 견적요청은 upsert(ignoreDuplicates) → DB unique constraint으로 원자적 중복 차단
-    // 그 외 이벤트는 일반 insert
-    const { error } = dedup_key
-      ? await supabase.from('events').upsert(event, { onConflict: 'dedup_key', ignoreDuplicates: true })
-      : await supabase.from('events').insert(event)
+    const { error } = await supabase.from('events').insert(event)
 
     if (error) {
       console.error('events insert error:', error)
