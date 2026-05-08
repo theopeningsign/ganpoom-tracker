@@ -127,6 +127,27 @@ export default async function handler(req, res) {
         }))
     }
 
+    // 텐핑 채널일 때 회원가입 실적 집계
+    let tenpingStats = null
+    if (channel === 'tenping_web') {
+      const referrerMap = {}
+      let signupCount = 0
+      ;(allEvents || []).forEach(ev => {
+        if (ev.event_category !== 'airbridge.user.signup') return
+        signupCount++
+        const ref = ev.referrer || '(직접유입)'
+        if (!referrerMap[ref]) referrerMap[ref] = 0
+        referrerMap[ref]++
+      })
+      tenpingStats = {
+        signupCount,
+        referrers: Object.entries(referrerMap)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([url, count]) => ({ url, count })),
+      }
+    }
+
     return res.status(200).json({
       success: true,
       total: (allEvents || []).length,
@@ -134,6 +155,7 @@ export default async function handler(req, res) {
       campaigns: campaignList,
       keywords: keywordList,
       agentStats,
+      tenpingStats,
       categories,
       devices,
       platforms,

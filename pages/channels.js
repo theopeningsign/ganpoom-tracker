@@ -171,7 +171,7 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
           { key: 'events', label: '이벤트 내역' },
           { key: 'campaigns', label: '캠페인' },
           ...(detail && detail.keywords && detail.keywords.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
-          ...(selectedChannel === 'agency' ? [{ key: 'agents', label: '실적' }] : []),
+          ...(selectedChannel === 'agency' || selectedChannel === 'tenping_web' ? [{ key: 'agents', label: '실적' }] : []),
           { key: 'trend', label: '일별 추이' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setDetailTab(tab.key)} style={{
@@ -323,8 +323,8 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
             </div>
           )}
 
-          {/* 실적 탭 (CPA 채널 전용) */}
-          {detailTab === 'agents' && (
+          {/* 실적 탭 (CPA / 텐핑 채널) */}
+          {detailTab === 'agents' && selectedChannel === 'agency' && (
             <div>
               <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
                 에이전트별 견적요청 실적 ({detail.agentStats?.length || 0}명)
@@ -361,10 +361,7 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
                         {agent.referrers.map((ref, j) => (
                           <a key={j} href={ref} target="_blank" rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            style={{
-                              fontSize: 11, color: '#4facfe',
-                              textDecoration: 'none', wordBreak: 'break-all',
-                            }}
+                            style={{ fontSize: 11, color: '#4facfe', textDecoration: 'none', wordBreak: 'break-all' }}
                             title={ref}
                           >
                             🔗 {shortReferrer(ref)}
@@ -372,6 +369,53 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
                         ))}
                       </div>
                     )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {detailTab === 'agents' && selectedChannel === 'tenping_web' && (
+            <div>
+              {/* 총 회원가입 요약 */}
+              <div style={{
+                background: '#fff8f0', borderRadius: 8, padding: '14px 16px',
+                marginBottom: 16, borderLeft: '3px solid #FF6B35',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <span style={{ fontSize: 13, color: '#888', fontWeight: 600 }}>총 회원가입</span>
+                <span style={{ fontSize: 22, fontWeight: 800, color: '#FF6B35' }}>
+                  {detail.tenpingStats?.signupCount || 0}건
+                </span>
+              </div>
+
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>유입 경로별 회원가입</div>
+
+              {!detail.tenpingStats?.referrers || detail.tenpingStats.referrers.length === 0 ? (
+                <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
+              ) : detail.tenpingStats.referrers.map(({ url, count }, i) => {
+                const isDirect = url === '(직접유입)'
+                const max = detail.tenpingStats.referrers[0].count
+                const pct = (count / max * 100).toFixed(0)
+                return (
+                  <div key={i} style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      {isDirect ? (
+                        <span style={{ fontSize: 12, color: '#888' }}>직접유입</span>
+                      ) : (
+                        <a href={url} target="_blank" rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          style={{ fontSize: 12, color: '#4facfe', textDecoration: 'none', flex: 1, marginRight: 8 }}
+                          title={url}
+                        >
+                          🔗 {shortReferrer(url)}
+                        </a>
+                      )}
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#333', flexShrink: 0 }}>{count}건</span>
+                    </div>
+                    <div style={{ height: 5, background: '#f0f0f0', borderRadius: 3 }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: '#FF6B35', borderRadius: 3 }} />
+                    </div>
                   </div>
                 )
               })}
