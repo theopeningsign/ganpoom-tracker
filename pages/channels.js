@@ -103,6 +103,26 @@ const EVENT_LABELS = {
   'event.conversion': '전환',
 }
 
+// gp001 → CPA_01
+function agentIdToCPA(agentId) {
+  if (!agentId || agentId === '(미지정)') return agentId
+  const num = parseInt(agentId.replace(/^gp/i, ''), 10)
+  if (isNaN(num)) return agentId
+  return 'CPA_' + String(num).padStart(2, '0')
+}
+
+// referrer URL 축약 표시 (40자 초과 시 자름)
+function shortReferrer(url) {
+  if (!url) return ''
+  try {
+    const { hostname, pathname } = new URL(url)
+    const path = pathname.length > 20 ? pathname.slice(0, 20) + '…' : pathname
+    return hostname + path
+  } catch {
+    return url.length > 40 ? url.slice(0, 40) + '…' : url
+  }
+}
+
 // ─── 채널 상세 패널 (공통 컴포넌트) ──────────────────────────────────────────
 function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, isInline }) {
   if (!selectedChannel || !selectedData) return null
@@ -151,6 +171,7 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
           { key: 'events', label: '이벤트 내역' },
           { key: 'campaigns', label: '캠페인' },
           ...(detail && detail.keywords && detail.keywords.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
+          ...(selectedChannel === 'agency' ? [{ key: 'agents', label: '실적' }] : []),
           { key: 'trend', label: '일별 추이' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setDetailTab(tab.key)} style={{
@@ -299,6 +320,61 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
                   )
                 })
               })()}
+            </div>
+          )}
+
+          {/* 실적 탭 (CPA 채널 전용) */}
+          {detailTab === 'agents' && (
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
+                에이전트별 견적요청 실적 ({detail.agentStats?.length || 0}명)
+              </div>
+              {!detail.agentStats || detail.agentStats.length === 0 ? (
+                <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
+              ) : detail.agentStats.map((agent, i) => {
+                const cpaLabel = agentIdToCPA(agent.agentId)
+                const isTop = i === 0 && agent.quotes > 0
+                return (
+                  <div key={agent.agentId} style={{
+                    marginBottom: 14, padding: '12px 14px',
+                    background: isTop ? '#f5f0ff' : '#f8f9fa',
+                    borderRadius: 8,
+                    borderLeft: `3px solid ${isTop ? '#9B59B6' : '#ddd'}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {i === 0 && agent.quotes > 0 && <span style={{ fontSize: 14 }}>🥇</span>}
+                        {i === 1 && agent.quotes > 0 && <span style={{ fontSize: 14 }}>🥈</span>}
+                        {i === 2 && agent.quotes > 0 && <span style={{ fontSize: 14 }}>🥉</span>}
+                        <span style={{
+                          fontSize: 13, fontWeight: 700,
+                          color: isTop ? '#9B59B6' : '#333'
+                        }}>{cpaLabel}</span>
+                      </div>
+                      <span style={{
+                        fontSize: 14, fontWeight: 800,
+                        color: agent.quotes > 0 ? '#9B59B6' : '#bbb'
+                      }}>{agent.quotes}건</span>
+                    </div>
+                    {agent.referrers && agent.referrers.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {agent.referrers.map((ref, j) => (
+                          <a key={j} href={ref} target="_blank" rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                              fontSize: 11, color: '#4facfe',
+                              textDecoration: 'none', wordBreak: 'break-all',
+                            }}
+                            title={ref}
+                          >
+                            🔗 {shortReferrer(ref)}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 

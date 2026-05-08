@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
     // 최근 이벤트 목록 (최대 50건)
     const { data: recentEvents, error: recentError } = await applyFilters(
-      supabase.from('events').select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at')
+      supabase.from('events').select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at, agent_id, referrer')
         .in('event_category', QUOTE_EVENTS)
     ).order('created_at', { ascending: false }).limit(50)
 
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     let pg = 0
     while (true) {
       const { data: pageData, error: pageError } = await applyFilters(
-        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term')
+        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term, agent_id, referrer')
       ).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
       if (pageError) { console.error('allEvents error:', pageError); break }
       allEvents = allEvents.concat(pageData || [])
@@ -107,12 +107,33 @@ export default async function handler(req, res) {
     const keywordList = Object.values(keywords)
       .sort((a, b) => b.quotes - a.quotes || b.visits - a.visits)
 
+    // CPA 채널일 때 에이전트별 실적 집계
+    let agentStats = []
+    if (channel === 'agency') {
+      const agentMap = {}
+      ;(allEvents || []).forEach(ev => {
+        if (!QUOTE_EVENTS.includes(ev.event_category)) return
+        const aid = ev.agent_id || '(미지정)'
+        if (!agentMap[aid]) agentMap[aid] = { agentId: aid, quotes: 0, referrers: new Set() }
+        agentMap[aid].quotes++
+        if (ev.referrer) agentMap[aid].referrers.add(ev.referrer)
+      })
+      agentStats = Object.values(agentMap)
+        .sort((a, b) => b.quotes - a.quotes)
+        .map(a => ({
+          agentId: a.agentId,
+          quotes: a.quotes,
+          referrers: [...a.referrers].slice(0, 5),
+        }))
+    }
+
     return res.status(200).json({
       success: true,
       total: (allEvents || []).length,
       recentEvents: recentEvents || [],
       campaigns: campaignList,
       keywords: keywordList,
+      agentStats,
       categories,
       devices,
       platforms,
