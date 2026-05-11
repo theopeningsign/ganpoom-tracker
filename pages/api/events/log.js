@@ -112,16 +112,27 @@ export default async function handler(req, res) {
     }
 
     // 중복 이벤트 방지 (같은 session_id + event_category 5초 이내 재전송 차단)
+    // 중복이더라도 req_id가 새로 들어왔으면 기존 레코드에 업데이트 (fire-and-forget)
     const sessionId = body.session_id || null
+    const reqId = body.req_id ? parseInt(body.req_id, 10) : null
     if (sessionId) {
       const fiveSecsAgo = new Date(Date.now() - 5000).toISOString()
-      const { count } = await supabase
+      const { data: existing } = await supabase
         .from('events')
-        .select('*', { count: 'exact', head: true })
+        .select('id, req_id')
         .eq('session_id', sessionId)
         .eq('event_category', normalized || body.event_category || '')
         .gte('created_at', fiveSecsAgo)
-      if (count > 0) {
+        .limit(1)
+        .maybeSingle()
+      if (existing) {
+        if (reqId && !existing.req_id) {
+          supabase.from('events')
+            .update({ req_id: reqId })
+            .eq('id', existing.id)
+            .then(() => {})
+            .catch(e => console.error('req_id update failed:', e.message))
+        }
         return res.status(200).json({ success: true, skipped: true, reason: 'duplicate' })
       }
     }
@@ -172,6 +183,7 @@ export default async function handler(req, res) {
       client_ip_subdivision: body.client_ip_subdivision || ipLocation.client_ip_subdivision || null,
 
       session_id: body.session_id || null,
+      req_id: reqId,
 
       // 스테이징 여부: landing_page 또는 referrer에 staging 포함되면 true
       is_staging: !!(
