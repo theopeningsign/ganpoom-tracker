@@ -716,6 +716,7 @@ export default function ChannelsPage() {
               { href: '/adcosts', label: '광고비 입력', icon: '💸' },
               { href: '/admin/agents', label: 'CPA 에이전트', icon: '👥' },
               { href: '/admin/settlement', label: '정산 관리', icon: '💰' },
+              { href: '/admin/contracts', label: '계약 수기 입력', icon: '✍️' },
             ].map(({ href, label, icon }) => (
               <Link key={href} href={href} style={{ textDecoration: 'none' }}>
                 <div style={{

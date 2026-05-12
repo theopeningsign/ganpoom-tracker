@@ -80,9 +80,11 @@ export default async function handler(req, res) {
 
     const uniqueReqIds = Object.keys(channelByReqId).map(Number)
 
-    // 20개씩 배치 병렬 조회
+    // 20개씩 배치 병렬 조회 (관리자 API)
     const BATCH_SIZE = 20
     const contracted = []
+    const contractedReqIds = new Set()
+
     for (let i = 0; i < uniqueReqIds.length; i += BATCH_SIZE) {
       const batch = uniqueReqIds.slice(i, i + BATCH_SIZE)
       const batchResults = await Promise.all(
@@ -91,7 +93,29 @@ export default async function handler(req, res) {
           return contract ? { reqId, channel: channelByReqId[reqId], ...contract } : null
         })
       )
-      contracted.push(...batchResults.filter(Boolean))
+      batchResults.filter(Boolean).forEach(r => {
+        contracted.push(r)
+        contractedReqIds.add(r.reqId)
+      })
+    }
+
+    // API에서 못 찾은 req_id → 수기 입력 테이블에서 보완
+    const missingReqIds = uniqueReqIds.filter(id => !contractedReqIds.has(id))
+    if (missingReqIds.length > 0) {
+      const { data: manualRows } = await supabase
+        .from('manual_contracts')
+        .select('req_id, product_cost')
+        .in('req_id', missingReqIds)
+      if (manualRows) {
+        manualRows.forEach(mc => {
+          contracted.push({
+            reqId: mc.req_id,
+            channel: channelByReqId[mc.req_id],
+            status: 'manual',
+            product_cost: mc.product_cost || 0,
+          })
+        })
+      }
     }
 
     // 채널별 집계
