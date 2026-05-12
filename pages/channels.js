@@ -468,6 +468,8 @@ export default function ChannelsPage() {
   const [loading, setLoading] = useState(true)
   const [showStaging, setShowStaging] = useState(false)
   const [adCosts, setAdCosts] = useState({}) // { 'event_channel': amount }
+  const [contractData, setContractData] = useState(null)  // { byChannel: { ch: { contracts, totalAmount } } }
+  const [contractLoading, setContractLoading] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [detail, setDetail] = useState(null)
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -477,6 +479,7 @@ export default function ChannelsPage() {
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
+    setContractData(null)  // 기간/플랫폼 바뀌면 계약현황 초기화
     try {
       const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/stats?${params}`)
@@ -586,6 +589,21 @@ export default function ChannelsPage() {
     'google':        'google',
     'tenping':       'tenping_web',
   }
+
+  const fetchContractData = useCallback(async () => {
+    setContractLoading(true)
+    setContractData(null)
+    try {
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      const res = await fetch(`/api/contracts/data?${params}`)
+      const json = await res.json()
+      if (json.success) setContractData(json)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setContractLoading(false)
+    }
+  }, [dates, platform])
 
   const fetchAdCosts = useCallback(async () => {
     try {
@@ -773,6 +791,16 @@ export default function ChannelsPage() {
                 background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600
               }}>조회</button>
 
+              <button onClick={fetchContractData} disabled={!data || contractLoading} style={{
+                padding: '8px 14px', borderRadius: 8, border: '1px solid #27ae60',
+                background: contractData ? '#f0fff4' : (data ? 'white' : '#f5f5f5'),
+                color: contractData ? '#27ae60' : (data ? '#27ae60' : '#ccc'),
+                fontSize: 13, cursor: (data && !contractLoading) ? 'pointer' : 'default', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 5
+              }}>
+                {contractLoading ? '⏳ 조회중...' : contractData ? `✅ 계약 ${contractData.total}건` : '📋 계약 현황'}
+              </button>
+
               <button onClick={downloadExcel} disabled={!data} style={{
                 padding: '8px 14px', borderRadius: 8, border: '1px solid #52c41a',
                 background: data ? '#f6ffed' : '#f5f5f5', color: data ? '#52c41a' : '#ccc',
@@ -909,6 +937,61 @@ export default function ChannelsPage() {
                                 </div>
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {/* 계약 현황 (계약 현황 버튼 클릭 후 표시) */}
+                        {contractData && contractData.byChannel[ch.channel] && (
+                          <div style={{
+                            marginTop: 12, padding: '10px 14px',
+                            background: '#f0fff4', borderRadius: 8,
+                            borderLeft: `3px solid #27ae60`,
+                          }}>
+                            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                              <div>
+                                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>계약 성사</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#27ae60' }}>
+                                  {contractData.byChannel[ch.channel].contracts}건
+                                </div>
+                              </div>
+                              {contractData.byChannel[ch.channel].totalAmount > 0 && (
+                                <div>
+                                  <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>계약 총액 (공급가액)</div>
+                                  <div style={{ fontSize: 14, fontWeight: 700, color: '#333' }}>
+                                    {contractData.byChannel[ch.channel].totalAmount.toLocaleString()}원
+                                  </div>
+                                </div>
+                              )}
+                              {ch.count > 0 && (
+                                <div>
+                                  <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>견적→계약 전환율</div>
+                                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2980b9' }}>
+                                    {((contractData.byChannel[ch.channel].contracts / ch.count) * 100).toFixed(1)}%
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            {contractData.byChannel[ch.channel].reqIds?.length > 0 && (
+                              <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {contractData.byChannel[ch.channel].reqIds.map(id => (
+                                  <span key={id} style={{
+                                    fontSize: 11, padding: '2px 8px', borderRadius: 12,
+                                    background: '#d4edda', color: '#155724', fontWeight: 600,
+                                    fontFamily: 'monospace',
+                                  }}>#{id}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {contractData && !contractData.byChannel[ch.channel] && ch.count > 0 && (
+                          <div style={{
+                            marginTop: 12, padding: '8px 14px',
+                            background: '#fafafa', borderRadius: 8,
+                            borderLeft: '3px solid #ddd',
+                            fontSize: 12, color: '#bbb',
+                          }}>
+                            계약 성사 없음
                           </div>
                         )}
 

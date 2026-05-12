@@ -112,7 +112,7 @@ export default async function handler(req, res) {
     }
 
     // 중복 이벤트 방지 (같은 session_id + event_category 5초 이내 재전송 차단)
-    // 중복이더라도 req_id가 새로 들어왔으면 기존 레코드에 업데이트 (fire-and-forget)
+    // 중복이더라도 req_id가 새로 들어왔으면 기존 레코드에 업데이트 (await으로 완료 보장 — Vercel 함수 종료 전 완료)
     const sessionId = body.session_id || null
     const reqId = body.req_id ? parseInt(body.req_id, 10) : null
     if (sessionId) {
@@ -127,11 +127,10 @@ export default async function handler(req, res) {
         .maybeSingle()
       if (existing) {
         if (reqId && !existing.req_id) {
-          supabase.from('events')
+          const { error: updateError } = await supabase.from('events')
             .update({ req_id: reqId })
             .eq('id', existing.id)
-            .then(() => {})
-            .catch(e => console.error('req_id update failed:', e.message))
+          if (updateError) console.error('req_id update failed:', updateError.message)
         }
         return res.status(200).json({ success: true, skipped: true, reason: 'duplicate' })
       }

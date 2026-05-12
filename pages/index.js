@@ -332,7 +332,7 @@ export default function Dashboard() {
 
   return (
     <>
-    <style>{`
+    <style suppressHydrationWarning>{`
       @media (max-width: 768px) {
         .gp-sidebar { display: none !important; }
         .gp-mobile-nav { display: flex !important; }
