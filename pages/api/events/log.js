@@ -117,9 +117,13 @@ export default async function handler(req, res) {
     const eventCategory = normalized || body.event_category || ''
     const tenSecsAgo = new Date(Date.now() - 10000).toISOString()
 
+    // [진단 로그] comparison.request 수신 시 req_id 여부 기록
+    if (eventCategory === 'comparison.request') {
+      console.log(`[REQ] received | session=${sessionId} | req_id=${body.req_id ?? 'NONE'} | parsed=${reqId}`)
+    }
+
     if (sessionId && reqId) {
       // req_id 있는 요청: 먼저 같은 session의 req_id=null 행이 있으면 UPDATE하고 종료
-      // (wrapper가 먼저 null로 INSERT한 경우, 또는 레이스 컨디션으로 null 행이 남은 경우)
       const { data: nullRow } = await supabase
         .from('events')
         .select('id')
@@ -133,8 +137,14 @@ export default async function handler(req, res) {
         const { error: updateError } = await supabase.from('events')
           .update({ req_id: reqId })
           .eq('id', nullRow.id)
-        if (updateError) console.error('req_id proactive update failed:', updateError.message)
+        if (updateError) {
+          console.error(`[REQ] UPDATE failed | session=${sessionId} | req_id=${reqId} | err=${updateError.message}`)
+        } else {
+          console.log(`[REQ] UPDATE ok | session=${sessionId} | req_id=${reqId} | row=${nullRow.id}`)
+        }
         return res.status(200).json({ success: true, skipped: true, reason: 'updated_req_id' })
+      } else {
+        console.log(`[REQ] null row not found, will INSERT | session=${sessionId} | req_id=${reqId}`)
       }
     }
 
@@ -150,6 +160,9 @@ export default async function handler(req, res) {
         .limit(1)
         .maybeSingle()
       if (existing) {
+        if (eventCategory === 'comparison.request') {
+          console.log(`[REQ] duplicate skip | session=${sessionId} | existing_req_id=${existing.req_id}`)
+        }
         return res.status(200).json({ success: true, skipped: true, reason: 'duplicate' })
       }
     }
