@@ -111,27 +111,45 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, skipped: true })
     }
 
-    // 중복 이벤트 방지 (같은 session_id + event_category 5초 이내 재전송 차단)
-    // 중복이더라도 req_id가 새로 들어왔으면 기존 레코드에 업데이트 (await으로 완료 보장 — Vercel 함수 종료 전 완료)
+    // 중복 이벤트 방지 + req_id 보정
     const sessionId = body.session_id || null
     const reqId = body.req_id ? parseInt(body.req_id, 10) : null
+    const eventCategory = normalized || body.event_category || ''
+    const tenSecsAgo = new Date(Date.now() - 10000).toISOString()
+
+    if (sessionId && reqId) {
+      // req_id 있는 요청: 먼저 같은 session의 req_id=null 행이 있으면 UPDATE하고 종료
+      // (wrapper가 먼저 null로 INSERT한 경우, 또는 레이스 컨디션으로 null 행이 남은 경우)
+      const { data: nullRow } = await supabase
+        .from('events')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('event_category', eventCategory)
+        .is('req_id', null)
+        .gte('created_at', tenSecsAgo)
+        .limit(1)
+        .maybeSingle()
+      if (nullRow) {
+        const { error: updateError } = await supabase.from('events')
+          .update({ req_id: reqId })
+          .eq('id', nullRow.id)
+        if (updateError) console.error('req_id proactive update failed:', updateError.message)
+        return res.status(200).json({ success: true, skipped: true, reason: 'updated_req_id' })
+      }
+    }
+
     if (sessionId) {
+      // 일반 중복 체크 (5초 이내 같은 session + event)
       const fiveSecsAgo = new Date(Date.now() - 5000).toISOString()
       const { data: existing } = await supabase
         .from('events')
         .select('id, req_id')
         .eq('session_id', sessionId)
-        .eq('event_category', normalized || body.event_category || '')
+        .eq('event_category', eventCategory)
         .gte('created_at', fiveSecsAgo)
         .limit(1)
         .maybeSingle()
       if (existing) {
-        if (reqId && !existing.req_id) {
-          const { error: updateError } = await supabase.from('events')
-            .update({ req_id: reqId })
-            .eq('id', existing.id)
-          if (updateError) console.error('req_id update failed:', updateError.message)
-        }
         return res.status(200).json({ success: true, skipped: true, reason: 'duplicate' })
       }
     }
@@ -196,6 +214,18 @@ export default async function handler(req, res) {
     if (error) {
       console.error('events insert error:', error)
       return res.status(500).json({ success: false, error: error.message })
+    }
+
+    // INSERT 성공 후, req_id 있는 행이 들어왔는데 레이스 컨디션으로
+    // null 행이 이미 존재하는 경우 제거 (await으로 완료 보장)
+    if (sessionId && reqId) {
+      const { error: cleanupError } = await supabase.from('events')
+        .delete()
+        .eq('session_id', sessionId)
+        .eq('event_category', event.event_category)
+        .is('req_id', null)
+        .gte('created_at', tenSecsAgo)
+      if (cleanupError) console.error('null row cleanup failed:', cleanupError.message)
     }
 
     return res.status(200).json({ success: true })
