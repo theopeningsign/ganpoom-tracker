@@ -540,9 +540,11 @@ export default function ChannelsPage() {
 
     // 광고비 있는 채널이 하나라도 있으면 광고비 컬럼 추가
     const hasAdCost = displayChannels.some(ch => (adCosts[ch.channel] || 0) > 0)
+    const hasContract = !!contractData
 
     const headers = ['채널', '방문수', '견적요청수', '전환율(%)']
     if (hasAdCost) headers.push('광고비(원)', 'CPA — 견적당(원)', 'CPV — 방문당(원)')
+    if (hasContract) headers.push('계약수', '계약총공급가(원)', '계약율(%)')
 
     const colCount = headers.length
     const sd = dates.startDate.replace(/-/g, '')
@@ -559,6 +561,19 @@ export default function ChannelsPage() {
           cost > 0 ? cost : '-',
           cost > 0 && ch.count > 0 ? Math.round(cost / ch.count) : '-',
           cost > 0 && ch.sessions > 0 ? Math.round(cost / ch.sessions) : '-',
+        )
+      }
+      if (hasContract) {
+        const cd = contractData.byChannel[ch.channel]
+        const contracts = cd ? cd.contracts : 0
+        const totalAmount = cd ? cd.totalAmount : 0
+        const contractRate = ch.count > 0 && contracts > 0
+          ? parseFloat(((contracts / ch.count) * 100).toFixed(1))
+          : '-'
+        row.push(
+          contracts > 0 ? contracts : '-',
+          totalAmount > 0 ? totalAmount : '-',
+          contractRate,
         )
       }
       return row
@@ -579,7 +594,7 @@ export default function ChannelsPage() {
 
     const fileName = `채널분석_${sd}_${ed}.xlsx`
     XLSX.writeFile(wb, fileName)
-  }, [data, adCosts, dates, displayChannels])
+  }, [data, adCosts, contractData, dates, displayChannels])
 
   // ad_costs 채널 키 → events 채널 키 매핑
   const ADCOST_TO_CH = {
@@ -816,6 +831,43 @@ export default function ChannelsPage() {
           ) : !data ? (
             <div style={{ textAlign: 'center', padding: 80, color: '#aaa' }}>데이터가 없습니다</div>
           ) : (
+            <>
+            {/* 계약 전체 요약 */}
+            {contractData && (() => {
+              const totalContracts = contractData.total
+              const totalAmount = Object.values(contractData.byChannel).reduce((s, c) => s + c.totalAmount, 0)
+              const totalQuotes = data.summary.total
+              const contractRate = totalQuotes > 0 ? ((totalContracts / totalQuotes) * 100).toFixed(1) : '0.0'
+              return (
+                <div style={{
+                  background: 'linear-gradient(135deg, #1a6b3a 0%, #27ae60 100%)',
+                  borderRadius: 14, padding: '20px 28px',
+                  boxShadow: '0 4px 16px rgba(39,174,96,0.3)', marginBottom: 16,
+                  display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap',
+                }}>
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>🏆 계약 총괄</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
+                  </div>
+                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>전체 계약수</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalContracts}건</div>
+                  </div>
+                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 공급가액</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalAmount.toLocaleString()}원</div>
+                  </div>
+                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>전체 계약전환율</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{contractRate}%</div>
+                  </div>
+                </div>
+              )
+            })()}
+
             <div className="ch-grid" style={{ display: 'grid', gridTemplateColumns: selectedChannel ? '1fr 380px' : '1fr', gap: 20 }}>
 
               {/* 채널 카드 목록 */}
@@ -1014,6 +1066,7 @@ export default function ChannelsPage() {
                 </div>
               )}
             </div>
+            </>
           )}
         </div>
       </div>
