@@ -11,6 +11,13 @@
 
   try {
 
+    // SDK 로드 전 호출 대비 pre-queue 스텁 (async 로딩 타이밍 버그 방지)
+    var _preQ = (window.GanpoomTracker && window.GanpoomTracker._q) || [];
+    window.GanpoomTracker = {
+      _q: _preQ,
+      track: function(e, i) { _preQ.push({ eventCategory: e, extra: i || {} }); },
+    };
+
     const CONFIG = {
       apiEndpoint: (function () {
         const tag = document.currentScript || document.querySelector('script[data-api]');
@@ -229,6 +236,10 @@
         } catch (_) { return null; }
       },
     };
+
+    // pre-queue 드레인: SDK 로드 전에 쌓인 이벤트 → 내부 큐로 이동
+    _preQ.forEach(function(item) { queue.push(item); });
+    _preQ.length = 0;
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', init);
