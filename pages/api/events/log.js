@@ -160,7 +160,17 @@ export default async function handler(req, res) {
         .limit(1)
         .maybeSingle()
       if (existing) {
-        if (eventCategory === 'comparison.request') {
+        if (reqId && !existing.req_id) {
+          // 중복 행이 req_id=null인데 현재 요청에 req_id 있으면 UPDATE
+          const { error: updateError } = await supabase.from('events')
+            .update({ req_id: reqId })
+            .eq('id', existing.id)
+          if (updateError) {
+            console.error(`[REQ] dedup UPDATE failed | session=${sessionId} | req_id=${reqId} | err=${updateError.message}`)
+          } else {
+            console.log(`[REQ] dedup UPDATE ok | session=${sessionId} | req_id=${reqId} | row=${existing.id}`)
+          }
+        } else if (eventCategory === 'comparison.request') {
           console.log(`[REQ] duplicate skip | session=${sessionId} | existing_req_id=${existing.req_id}`)
         }
         return res.status(200).json({ success: true, skipped: true, reason: 'duplicate' })
