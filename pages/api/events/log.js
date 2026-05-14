@@ -149,14 +149,13 @@ export default async function handler(req, res) {
     }
 
     if (sessionId) {
-      // 일반 중복 체크 (5초 이내 같은 session + event)
-      const fiveSecsAgo = new Date(Date.now() - 5000).toISOString()
+      // 일반 중복 체크 (10초 이내 같은 session + event)
       const { data: existing } = await supabase
         .from('events')
         .select('id, req_id')
         .eq('session_id', sessionId)
         .eq('event_category', eventCategory)
-        .gte('created_at', fiveSecsAgo)
+        .gte('created_at', tenSecsAgo)
         .limit(1)
         .maybeSingle()
       if (existing) {
@@ -237,18 +236,6 @@ export default async function handler(req, res) {
     if (error) {
       console.error('events insert error:', error)
       return res.status(500).json({ success: false, error: error.message })
-    }
-
-    // INSERT 성공 후, req_id 있는 행이 들어왔는데 레이스 컨디션으로
-    // null 행이 이미 존재하는 경우 제거 (await으로 완료 보장)
-    if (sessionId && reqId) {
-      const { error: cleanupError } = await supabase.from('events')
-        .delete()
-        .eq('session_id', sessionId)
-        .eq('event_category', event.event_category)
-        .is('req_id', null)
-        .gte('created_at', tenSecsAgo)
-      if (cleanupError) console.error('null row cleanup failed:', cleanupError.message)
     }
 
     return res.status(200).json({ success: true })
