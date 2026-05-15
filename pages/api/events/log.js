@@ -231,11 +231,33 @@ export default async function handler(req, res) {
       ),
     }
 
-    const { error } = await supabase.from('events').insert(event)
+    const { data: insertedRow, error } = await supabase.from('events').insert(event).select('id').maybeSingle()
 
     if (error) {
       console.error('events insert error:', error)
       return res.status(500).json({ success: false, error: error.message })
+    }
+
+    if (!insertedRow && sessionId && reqId) {
+      // INSERT가 DB 트리거(prevent_duplicate_events)에 의해 취소됨
+      // → 기존 null 행을 찾아서 req_id UPDATE
+      console.log(`[REQ] INSERT cancelled by trigger | session=${sessionId} | req_id=${reqId}`)
+      const { data: nullRow } = await supabase
+        .from('events')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('event_category', event.event_category)
+        .is('req_id', null)
+        .gte('created_at', tenSecsAgo)
+        .limit(1)
+        .maybeSingle()
+      if (nullRow) {
+        const { error: upErr } = await supabase.from('events').update({ req_id: reqId }).eq('id', nullRow.id)
+        if (upErr) console.error(`[REQ] trigger fallback UPDATE failed | session=${sessionId} | req_id=${reqId} | err=${upErr.message}`)
+        else console.log(`[REQ] trigger fallback UPDATE ok | session=${sessionId} | req_id=${reqId} | row=${nullRow.id}`)
+      } else {
+        console.log(`[REQ] trigger fallback: no null row found | session=${sessionId} | req_id=${reqId}`)
+      }
     }
 
     return res.status(200).json({ success: true })
