@@ -47,6 +47,32 @@ const TYPE_BADGE = {
   cpa: { label: 'CPA', bg: '#f8d7da', color: '#721c24' },
 }
 
+const EVENT_LABELS = {
+  'session.start': '세션 시작',
+  'comparison.request': '비교견적 요청',
+  'simple.request': '간단 견적',
+  'airbridge.ecommerce.order.completed': '스타일시공 요청',
+  'order.complete': '주문 완료',
+  'airbridge.user.signup': '회원가입',
+  'comparison.contract': '계약 완료',
+  'comparison.consult': '상담 요청',
+  'consult.chat': '채팅 상담',
+  'phone.click': '전화 클릭',
+  'event.conversion': '이벤트 전환',
+}
+
+function shortReferrer(url) {
+  if (!url) return ''
+  try {
+    const u = new URL(url)
+    const path = u.pathname + (u.search ? '?' + u.searchParams.toString().slice(0, 30) : '')
+    const full = u.hostname.replace('www.', '') + path
+    return full.length > 45 ? full.slice(0, 42) + '…' : full
+  } catch {
+    return url.length > 45 ? url.slice(0, 42) + '…' : url
+  }
+}
+
 // 엑셀 내보내기용 Event Category 표기 (Airbridge 형식)
 const CATEGORY_EXPORT_LABELS = {
   'comparison.request': 'ganpoomclient.comparison.request',
@@ -218,6 +244,24 @@ export default function Dashboard() {
   const [exporting, setExporting] = useState(false)
   const [categoryModal, setCategoryModal] = useState(null) // { category, label, data }
   const [modalLoading, setModalLoading] = useState(false)
+  const [chModal, setChModal] = useState(null) // { channel, label }
+  const [chDetail, setChDetail] = useState(null)
+  const [chDetailLoading, setChDetailLoading] = useState(false)
+  const [chDetailTab, setChDetailTab] = useState('events')
+
+  const openChannelModal = useCallback(async (channel, label) => {
+    setChDetail(null)
+    setChDetailTab('events')
+    setChModal({ channel, label })
+    setChDetailLoading(true)
+    try {
+      const params = new URLSearchParams({ channel, startDate: dates.startDate, endDate: dates.endDate, platform })
+      const res = await fetch(`/api/events/channel-detail?${params}`)
+      const json = await res.json()
+      if (json.success) setChDetail(json)
+    } catch (e) { console.error(e) }
+    finally { setChDetailLoading(false) }
+  }, [dates, platform])
 
   const openCategoryModal = useCallback(async (category, label) => {
     setModalLoading(true)
@@ -439,6 +483,181 @@ export default function Dashboard() {
       </div>
     )}
 
+    {/* 채널 상세 모달 */}
+    {chModal && (
+      <div onClick={() => setChModal(null)}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div onClick={e => e.stopPropagation()}
+          className="gp-modal-box"
+          style={{ background: 'white', borderRadius: 16, width: 520, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+          {/* 헤더 */}
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: CHANNEL_COLORS[chModal.channel] || '#bbb' }} />
+                <span style={{ fontWeight: 700, fontSize: 16 }}>{chModal.label}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 3 }}>{dates.startDate} ~ {dates.endDate}</div>
+            </div>
+            <button onClick={() => setChModal(null)} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: '#aaa' }}>✕</button>
+          </div>
+
+          {/* 탭 */}
+          {!chDetailLoading && chDetail && (
+            <div style={{ padding: '12px 24px 0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 4, background: '#f5f6fa', borderRadius: 8, padding: 4 }}>
+                {[
+                  { key: 'events', label: '이벤트 내역' },
+                  ...(chDetail.keywords?.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
+                  ...(chModal.channel === 'unattributed' && chDetail.referrerDomains?.length > 0 ? [{ key: 'referrers', label: '유입경로' }] : []),
+                  { key: 'trend', label: '일별 추이' },
+                ].map(tab => (
+                  <button key={tab.key} onClick={() => setChDetailTab(tab.key)} style={{
+                    flex: 1, padding: '7px 0', border: 'none', borderRadius: 6,
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    background: chDetailTab === tab.key ? 'white' : 'transparent',
+                    color: chDetailTab === tab.key ? '#333' : '#888',
+                    boxShadow: chDetailTab === tab.key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  }}>{tab.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 본문 */}
+          <div style={{ overflowY: 'auto', padding: '16px 24px', flex: 1 }}>
+            {chDetailLoading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>불러오는 중...</div>
+            ) : !chDetail ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>데이터가 없습니다</div>
+            ) : (
+              <>
+                {/* 이벤트 내역 탭 */}
+                {chDetailTab === 'events' && (
+                  <div>
+                    <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>최근 {chDetail.recentEvents.length}건 (최대 50건)</div>
+                    {chDetail.recentEvents.length === 0 ? (
+                      <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>이벤트 없음</div>
+                    ) : chDetail.recentEvents.map((ev, i) => {
+                      const dt = new Date(ev.created_at)
+                      const dateStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+                      return (
+                        <div key={ev.id || i} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, background: '#eef4ff', color: '#4facfe', padding: '2px 8px', borderRadius: 20 }}>
+                              {EVENT_LABELS[ev.event_category] || ev.event_category}
+                            </span>
+                            <span style={{ fontSize: 11, color: '#aaa' }}>{dateStr}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {ev.campaign && <span style={{ fontSize: 11, color: '#666' }}>📢 {ev.campaign}</span>}
+                            {ev.device_type && <span style={{ fontSize: 11, color: '#888' }}>{ev.device_type === 'mobile' ? '📱' : '🖥️'} {ev.device_type}</span>}
+                            {ev.client_ip_city && <span style={{ fontSize: 11, color: '#888' }}>📍 {ev.client_ip_city}</span>}
+                            {ev.platform === 'app' && <span style={{ fontSize: 11, color: '#9B59B6', fontWeight: 600 }}>앱</span>}
+                            {chModal.channel === 'unattributed' && ev.referrer && (
+                              <a href={ev.referrer} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                                style={{ fontSize: 11, color: '#4facfe', textDecoration: 'none', wordBreak: 'break-all' }} title={ev.referrer}>
+                                🔗 {shortReferrer(ev.referrer)}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* 키워드 탭 */}
+                {chDetailTab === 'keywords' && (
+                  <div>
+                    <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>견적요청을 만든 키워드 ({chDetail.keywords.length}개)</div>
+                    {(() => {
+                      const max = Math.max(...chDetail.keywords.map(k => k.visits), 1)
+                      return chDetail.keywords.map(kw => {
+                        const pct = (kw.visits / max * 100).toFixed(1)
+                        const isNaver = kw.source === 'naver'
+                        const convRate = kw.visits > 0 ? (kw.quotes / kw.visits * 100).toFixed(1) : '0.0'
+                        return (
+                          <div key={kw.keyword} style={{ marginBottom: 14 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600, background: isNaver ? '#e8f9ee' : '#e8f0fe', color: isNaver ? '#03C75A' : '#4285F4' }}>{isNaver ? 'N' : 'G'}</span>
+                                <span style={{ color: '#333', fontWeight: 500 }}>{kw.keyword}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, color: '#888' }}>방문 {kw.visits}</span>
+                                <span style={{ fontSize: 12, fontWeight: 700 }}>견적 {kw.quotes}건</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c' }}>{convRate}%</span>
+                              </div>
+                            </div>
+                            <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: isNaver ? '#03C75A' : '#4285F4', borderRadius: 3 }} />
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
+                )}
+
+                {/* 유입경로 탭 (자연유입) */}
+                {chDetailTab === 'referrers' && (
+                  <div>
+                    <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>견적요청 발생 시 유입 경로 ({chDetail.referrerDomains?.length || 0}개)</div>
+                    {(() => {
+                      const max = Math.max(...chDetail.referrerDomains.map(d => d.visits), 1)
+                      return chDetail.referrerDomains.map(item => {
+                        const pct = (item.visits / max * 100).toFixed(1)
+                        const convRate = item.visits > 0 ? (item.quotes / item.visits * 100).toFixed(1) : '0.0'
+                        return (
+                          <div key={item.domain} style={{ marginBottom: 14 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600, background: item.isDirect ? '#f0f0f0' : '#fff3e0', color: item.isDirect ? '#999' : '#e67e22' }}>{item.isDirect ? '직접' : '유입'}</span>
+                                <span style={{ color: '#333', fontWeight: 500 }}>{item.domain}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, color: '#888' }}>방문 {item.visits}</span>
+                                <span style={{ fontSize: 12, fontWeight: 700 }}>견적 {item.quotes}건</span>
+                                {item.visits > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c' }}>{convRate}%</span>}
+                              </div>
+                            </div>
+                            <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: item.isDirect ? '#bdc3c7' : '#e67e22', borderRadius: 3 }} />
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
+                )}
+
+                {/* 일별 추이 탭 */}
+                {chDetailTab === 'trend' && (
+                  <div>
+                    <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>일별 전체 이벤트 수</div>
+                    {chDetail.dailyTrend.length === 0 ? (
+                      <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <LineChart data={chDetail.dailyTrend}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={v => v.slice(5)} />
+                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <Tooltip formatter={v => [v + '건', '이벤트']} />
+                          <Line type="monotone" dataKey="count" stroke={CHANNEL_COLORS[chModal.channel] || '#4facfe'} strokeWidth={2} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
     <PasswordProtection>
       <div style={{ background: '#f5f6fa', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
         <Sidebar current="/" />
@@ -548,12 +767,18 @@ export default function Dashboard() {
                         const badge = TYPE_BADGE[ch.channel_type] || TYPE_BADGE.organic
                         const pct = data.summary.total > 0 ? ((ch.count / data.summary.total) * 100).toFixed(1) : '0.0'
                         const color = CHANNEL_COLORS[ch.channel] || '#bbb'
+                        const chLabel = CHANNEL_LABELS[ch.channel] || ch.channel
                         return (
-                          <tr key={ch.channel} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                          <tr key={ch.channel}
+                            onClick={() => openChannelModal(ch.channel, chLabel)}
+                            style={{ borderBottom: '1px solid #f5f5f5', cursor: 'pointer' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
+                            onMouseLeave={e => e.currentTarget.style.background = ''}
+                          >
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                                <span style={{ fontSize: 13, fontWeight: 500 }}>{CHANNEL_LABELS[ch.channel] || ch.channel}</span>
+                                <span style={{ fontSize: 13, fontWeight: 500 }}>{chLabel}</span>
                               </div>
                             </td>
                             <td style={{ padding: '12px 16px', textAlign: 'center' }}>

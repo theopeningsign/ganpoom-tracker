@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
     // 최근 이벤트 목록 (최대 50건)
     const { data: recentEvents, error: recentError } = await applyFilters(
-      supabase.from('events').select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at, agent_id, referrer')
+      supabase.from('events').select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at, agent_id, referrer, referrer_domain')
         .in('event_category', QUOTE_EVENTS)
     ).order('created_at', { ascending: false }).limit(50)
 
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     let pg = 0
     while (true) {
       const { data: pageData, error: pageError } = await applyFilters(
-        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term, agent_id, referrer')
+        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term, agent_id, referrer, referrer_domain')
       ).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
       if (pageError) { console.error('allEvents error:', pageError); break }
       allEvents = allEvents.concat(pageData || [])
@@ -107,6 +107,22 @@ export default async function handler(req, res) {
     const keywordList = Object.values(keywords)
       .sort((a, b) => b.quotes - a.quotes || b.visits - a.visits)
 
+    // 자연유입 채널일 때 referrer_domain 집계
+    let referrerDomains = []
+    if (channel === 'unattributed') {
+      const domainMap = {}
+      ;(allEvents || []).forEach(ev => {
+        const domain = ev.referrer_domain || null
+        const key = domain || '(직접유입)'
+        if (!domainMap[key]) domainMap[key] = { domain: key, isDirect: !domain, visits: 0, quotes: 0 }
+        if (ev.event_category === 'session.start') domainMap[key].visits++
+        if (QUOTE_EVENTS.includes(ev.event_category)) domainMap[key].quotes++
+      })
+      referrerDomains = Object.values(domainMap)
+        .sort((a, b) => (b.visits + b.quotes) - (a.visits + a.quotes))
+        .slice(0, 20)
+    }
+
     // CPA 채널일 때 에이전트별 실적 집계
     let agentStats = []
     if (channel === 'agency') {
@@ -156,6 +172,7 @@ export default async function handler(req, res) {
       keywords: keywordList,
       agentStats,
       tenpingStats,
+      referrerDomains,
       categories,
       devices,
       platforms,

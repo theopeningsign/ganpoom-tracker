@@ -172,6 +172,7 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
           { key: 'campaigns', label: '캠페인' },
           ...(detail && detail.keywords && detail.keywords.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
           ...(selectedChannel === 'agency' || selectedChannel === 'tenping_web' ? [{ key: 'agents', label: '실적' }] : []),
+          ...(selectedChannel === 'unattributed' && detail && detail.referrerDomains && detail.referrerDomains.length > 0 ? [{ key: 'referrers', label: '유입경로' }] : []),
           { key: 'trend', label: '일별 추이' },
         ].map(tab => (
           <button key={tab.key} onClick={() => setDetailTab(tab.key)} style={{
@@ -237,6 +238,13 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
                       )}
                       {ev.platform === 'app' && (
                         <span style={{ fontSize: 11, color: '#9B59B6', fontWeight: 600 }}>앱</span>
+                      )}
+                      {selectedChannel === 'unattributed' && ev.referrer && (
+                        <a href={ev.referrer} target="_blank" rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          style={{ fontSize: 11, color: '#4facfe', textDecoration: 'none', wordBreak: 'break-all' }}
+                          title={ev.referrer}
+                        >🔗 {shortReferrer(ev.referrer)}</a>
                       )}
                     </div>
                   </div>
@@ -419,6 +427,55 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* 유입경로 탭 (자연유입 채널) */}
+          {detailTab === 'referrers' && (
+            <div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
+                견적요청 발생 시 유입 경로 ({detail.referrerDomains?.length || 0}개)
+              </div>
+              {!detail.referrerDomains || detail.referrerDomains.length === 0 ? (
+                <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
+              ) : (() => {
+                const max = Math.max(...detail.referrerDomains.map(d => d.visits), 1)
+                return detail.referrerDomains.map((item) => {
+                  const pct = (item.visits / max * 100).toFixed(1)
+                  const convRate = item.visits > 0 ? (item.quotes / item.visits * 100).toFixed(1) : '0.0'
+                  return (
+                    <div key={item.domain} style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{
+                            fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600,
+                            background: item.isDirect ? '#f0f0f0' : '#fff3e0',
+                            color: item.isDirect ? '#999' : '#e67e22'
+                          }}>{item.isDirect ? '직접' : '유입'}</span>
+                          <span style={{ color: '#333', fontWeight: 500 }}>{item.domain}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: '#888' }}>방문 {item.visits}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#333' }}>견적 {item.quotes}건</span>
+                          {item.visits > 0 && (
+                            <span style={{
+                              fontSize: 11, fontWeight: 700,
+                              color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c'
+                            }}>{convRate}%</span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
+                        <div style={{
+                          height: '100%', width: `${pct}%`,
+                          background: item.isDirect ? '#bdc3c7' : '#e67e22',
+                          borderRadius: 3, transition: 'width 0.4s'
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
             </div>
           )}
 
