@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 import * as XLSX from 'xlsx'
 import PasswordProtection from '../components/PasswordProtection'
@@ -635,7 +635,6 @@ export default function Dashboard() {
                 {/* 일별 추이 탭 */}
                 {chDetailTab === 'trend' && (
                   <div>
-                    <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>일별 전체 이벤트 수</div>
                     {chDetail.dailyTrend.length === 0 ? (
                       <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
                     ) : (
@@ -643,9 +642,12 @@ export default function Dashboard() {
                         <LineChart data={chDetail.dailyTrend}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                           <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={v => v.slice(5)} />
-                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-                          <Tooltip formatter={v => [v + '건', '이벤트']} />
-                          <Line type="monotone" dataKey="count" stroke={CHANNEL_COLORS[chModal.channel] || '#4facfe'} strokeWidth={2} dot={{ r: 3 }} />
+                          <YAxis yAxisId="left" tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#f97316' }} allowDecimals={false} />
+                          <Tooltip formatter={(v, name) => [v + '건', name === 'visits' ? '방문자수' : '견적요청수']} />
+                          <Legend formatter={name => name === 'visits' ? '방문자수' : '견적요청수'} wrapperStyle={{ fontSize: 12 }} />
+                          <Line yAxisId="left" type="monotone" dataKey="visits" stroke="#4facfe" strokeWidth={2} dot={{ r: 3 }} />
+                          <Line yAxisId="right" type="monotone" dataKey="quotes" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     )}

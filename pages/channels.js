@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import PasswordProtection from '../components/PasswordProtection'
 import * as XLSX from 'xlsx'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const CHANNEL_LABELS = {
   'naver.searchad': 'N(link)',
@@ -484,29 +485,20 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
             <div>
               {detail.dailyTrend.length === 0 ? (
                 <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>데이터 없음</div>
-              ) : (() => {
-                const max = Math.max(...detail.dailyTrend.map(d => d.count), 1)
-                return detail.dailyTrend.map(d => {
-                  const pct = (d.count / max * 100).toFixed(1)
-                  const date = new Date(d.date)
-                  const label = `${date.getMonth()+1}/${date.getDate()}`
-                  return (
-                    <div key={d.date} style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ fontSize: 12, color: '#888', minWidth: 36 }}>{label}</div>
-                      <div style={{ flex: 1, height: 18, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', width: `${pct}%`,
-                          background: color,
-                          borderRadius: 4, minWidth: d.count > 0 ? 24 : 0
-                        }} />
-                      </div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#555', minWidth: 28, textAlign: 'right' }}>
-                        {d.count}
-                      </div>
-                    </div>
-                  )
-                })
-              })()}
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={detail.dailyTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={v => v.slice(5)} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} allowDecimals={false} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#f97316' }} allowDecimals={false} />
+                    <Tooltip formatter={(v, name) => [v + '건', name === 'visits' ? '방문자수' : '견적요청수']} />
+                    <Legend formatter={name => name === 'visits' ? '방문자수' : '견적요청수'} wrapperStyle={{ fontSize: 12 }} />
+                    <Line yAxisId="left" type="monotone" dataKey="visits" stroke="#4facfe" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="quotes" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           )}
         </>

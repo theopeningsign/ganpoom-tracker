@@ -79,8 +79,9 @@ export default async function handler(req, res) {
       if (ev.created_at) {
         const kstDate = new Date(new Date(ev.created_at).getTime() + 9 * 60 * 60 * 1000)
         const day = kstDate.toISOString().slice(0, 10)
-        if (!daily[day]) daily[day] = 0
-        daily[day]++
+        if (!daily[day]) daily[day] = { visits: 0, quotes: 0 }
+        if (ev.event_category === 'session.start') daily[day].visits++
+        if (QUOTE_EVENTS.includes(ev.event_category)) daily[day].quotes++
       }
 
       // 키워드: session.start만 방문으로 카운트 (견적 이벤트는 quotes만)
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
 
     const dailyTrend = Object.entries(daily)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, count]) => ({ date, count }))
+      .map(([date, { visits, quotes }]) => ({ date, visits, quotes }))
 
     const campaignList = Object.entries(campaigns)
       .sort((a, b) => b[1] - a[1])
