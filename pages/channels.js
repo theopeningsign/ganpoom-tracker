@@ -881,6 +881,41 @@ export default function ChannelsPage() {
             <div style={{ textAlign: 'center', padding: 80, color: '#aaa' }}>데이터가 없습니다</div>
           ) : (
             <>
+            {/* 광고비 총괄 */}
+            {adCosts && Object.keys(adCosts).length > 0 && (() => {
+              const totalAdCost = Object.values(adCosts).reduce((s, v) => s + v, 0)
+              const channelEntries = Object.entries(adCosts).sort((a, b) => b[1] - a[1])
+              return (
+                <div style={{
+                  background: 'linear-gradient(135deg, #1a3a6b 0%, #2980b9 100%)',
+                  borderRadius: 14, padding: '20px 28px',
+                  boxShadow: '0 4px 16px rgba(41,128,185,0.3)', marginBottom: 16,
+                  display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap',
+                }}>
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>💸 광고비 총괄</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
+                  </div>
+                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 광고비</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalAdCost.toLocaleString()}원</div>
+                  </div>
+                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                    {channelEntries.map(([ch, amount]) => (
+                      <div key={ch}>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                          {CHANNEL_LABELS[ch] || ch}
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{amount.toLocaleString()}원</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* 계약 전체 요약 */}
             {contractData && (() => {
               const totalContracts = contractData.total
