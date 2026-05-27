@@ -191,6 +191,7 @@ function StatCard({ label, value, sub, color, onClick }) {
 const NAV = [
   { href: '/', label: '대시보드', icon: '📊' },
   { href: '/channels', label: '채널 분석', icon: '📡' },
+  { href: '/unconfirmed', label: '미확인 계약', icon: '⚠️' },
   { href: '/adcosts', label: '광고비 입력', icon: '💸' },
   { href: '/admin/agents', label: 'CPA 에이전트', icon: '👥' },
   { href: '/admin/settlement', label: '정산 관리', icon: '💰' },
@@ -404,15 +405,26 @@ export default function Dashboard() {
       padding: '0 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
     }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>📊 대시보드</div>
-      <Link href="/channels" style={{ textDecoration: 'none' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: 'rgba(255,255,255,0.1)', borderRadius: 20,
-          padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
-        }}>
-          <span>📡</span><span>채널분석</span>
-        </div>
-      </Link>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Link href="/unconfirmed" style={{ textDecoration: 'none' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'rgba(249,115,22,0.25)', borderRadius: 20,
+            padding: '6px 14px', fontSize: 13, color: '#fdba74', fontWeight: 600
+          }}>
+            <span>⚠️</span><span>미확인</span>
+          </div>
+        </Link>
+        <Link href="/channels" style={{ textDecoration: 'none' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'rgba(255,255,255,0.1)', borderRadius: 20,
+            padding: '6px 14px', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: 600
+          }}>
+            <span>📡</span><span>채널분석</span>
+          </div>
+        </Link>
+      </div>
     </div>
     {/* 전환 유형 상세 모달 */}
     {categoryModal && (

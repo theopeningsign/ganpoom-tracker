@@ -199,6 +199,51 @@ ganpoom-tracker-main/
 - `channels.js` 상단에 파란 배너로 총 광고비 + 채널별 금액 표시
 - 계약현황 초록 배너와 함께 보여 광고비 대비 성과 직관적 비교 가능
 
+### 2026-05 — 미확인 계약 알림판 연락관리 기능 추가
+
+**배경:** 상담 참여 후 2주 이상 경과했으나 계약 미확인 견적을 추적하는 알림판에, 연락완료 관리 기능 추가
+
+**변경 파일:**
+- `pages/api/unconfirmed/index.js` — 핵심 로직 개선
+- `pages/api/unconfirmed/status.js` — 신규 생성 (연락완료 상태 API)
+- `pages/unconfirmed.js` — UI 전면 개편
+
+**Supabase 테이블 추가:**
+```sql
+CREATE TABLE unconfirmed_status (
+  req_id bigint PRIMARY KEY,
+  status text NOT NULL DEFAULT 'contacted',
+  memo text,
+  updated_at timestamptz DEFAULT now()
+);
+```
+- `req_id`만 실제로 사용 (용량 최소화 원칙)
+- 목적: 이미 관리한 견적은 다음 조회 시 백엔드 API 호출 자체를 스킵해 속도 개선
+
+**API 개선 (`index.js`):**
+- `unconfirmed_status`에서 연락완료 req_id를 먼저 조회
+- `activeReqIds` = 전체 - 연락완료 → 백엔드 API(detail_matched, advcie_joinpartners)는 이것만 호출
+- 고객명/전화번호: `detail.req.name`, `detail.req.phone` 에서 직접 가져옴 (XLSX 보조)
+- XLSX(`ex_alldata`) 파싱: `range: 1`로 첫 번째 타이틀 행 스킵 수정
+
+**UI 개선 (`unconfirmed.js`):**
+- "✅ 연락완료" 버튼 → POST `/api/unconfirmed/status` → 즉시 흑백 처리 (grayscale 100% + opacity 0.6)
+- "↩ 취소" 버튼으로 실수 복구 가능
+- 연락완료 항목은 하단 별도 섹션으로 접기/펼치기
+- 요약 배너: 미연락/연락완료/스캔건수 표시
+- 다음 조회부터 연락완료 항목은 자동 제외됨 안내 표시
+- "🔄 상태 재확인" 버튼: 현재 미연락 항목들만 `detail_matched` 재조회 → 계약됨/삭제됨 배지 표시
+  - `pages/api/unconfirmed/recheck.js` — GET `?req_ids=1,2,3` → `{ results: { [reqId]: 'contracted'|'deleted'|'active' } }`
+  - 계약됨: 노란 배경 + "⚠️ 계약 진행됨" 배지
+  - 삭제됨: 빨간 배경 + "🗑️ 견적 삭제됨" 배지
+
+**모바일 대응 (`unconfirmed.js`):**
+- 모바일 상단 고정 네비바 추가 (⚠️ 미확인 계약 | 📊 대시보드 버튼)
+- 카드 레이아웃 모바일에서 세로 스택으로 전환
+- 전화번호: `tel:` 링크 → 📋 클릭 시 클립보드 복사 버튼 (복사 후 2초간 "✅ 복사됨!" 표시)
+- 상세 보기: 카드 하단에 별도 바로 분리 (연락완료 버튼과 실수 탭 방지)
+- 대시보드 모바일 네비바에 ⚠️ 미확인 버튼 추가 (`index.js`)
+
 ### 2026-05 — 유입경로 탭 전체 URL 기반으로 개선
 - `channel-detail.js`: referrer_domain → referrer 전체 URL 기반 집계 (글 단위 식별 가능)
 - 유입경로 탭 노출 채널 확대: 유료 검색광고(naver.searchad, naver_powercontents, google, google.adwords) 제외한 모든 채널

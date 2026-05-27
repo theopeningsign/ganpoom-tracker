@@ -779,6 +779,7 @@ export default function ChannelsPage() {
             {[
               { href: '/', label: '대시보드', icon: '📊' },
               { href: '/channels', label: '채널 분석', icon: '📡' },
+              { href: '/unconfirmed', label: '미확인 계약', icon: '⚠️' },
               { href: '/adcosts', label: '광고비 입력', icon: '💸' },
               { href: '/admin/agents', label: 'CPA 에이전트', icon: '👥' },
               { href: '/admin/settlement', label: '정산 관리', icon: '💰' },
