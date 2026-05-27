@@ -108,21 +108,19 @@ export default async function handler(req, res) {
     const keywordList = Object.values(keywords)
       .sort((a, b) => b.quotes - a.quotes || b.visits - a.visits)
 
-    // 자연유입 채널일 때 referrer_domain 집계
+    // referrer 전체 URL 집계 (모든 채널)
     let referrerDomains = []
-    if (channel === 'unattributed') {
-      const domainMap = {}
-      ;(allEvents || []).forEach(ev => {
-        const domain = ev.referrer_domain || null
-        const key = domain || '(직접유입)'
-        if (!domainMap[key]) domainMap[key] = { domain: key, isDirect: !domain, visits: 0, quotes: 0 }
-        if (ev.event_category === 'session.start') domainMap[key].visits++
-        if (QUOTE_EVENTS.includes(ev.event_category)) domainMap[key].quotes++
-      })
-      referrerDomains = Object.values(domainMap)
-        .sort((a, b) => (b.visits + b.quotes) - (a.visits + a.quotes))
-        .slice(0, 20)
-    }
+    const domainMap = {}
+    ;(allEvents || []).forEach(ev => {
+      const url = ev.referrer || null
+      const key = url || '(직접유입)'
+      if (!domainMap[key]) domainMap[key] = { url: key, isDirect: !url, visits: 0, quotes: 0 }
+      if (ev.event_category === 'session.start') domainMap[key].visits++
+      if (QUOTE_EVENTS.includes(ev.event_category)) domainMap[key].quotes++
+    })
+    referrerDomains = Object.values(domainMap)
+      .sort((a, b) => (b.visits + b.quotes) - (a.visits + a.quotes))
+      .slice(0, 30)
 
     // CPA 채널일 때 에이전트별 실적 집계
     let agentStats = []

@@ -509,7 +509,7 @@ export default function Dashboard() {
                 {[
                   { key: 'events', label: '이벤트 내역' },
                   ...(chDetail.keywords?.length > 0 ? [{ key: 'keywords', label: '키워드' }] : []),
-                  ...(chModal.channel === 'unattributed' && chDetail.referrerDomains?.length > 0 ? [{ key: 'referrers', label: '유입경로' }] : []),
+                  ...(!['naver.searchad','naver_powercontents','google','google.adwords'].includes(chModal.channel) && chDetail.referrerDomains?.length > 0 ? [{ key: 'referrers', label: '유입경로' }] : []),
                   { key: 'trend', label: '일별 추이' },
                 ].map(tab => (
                   <button key={tab.key} onClick={() => setChDetailTab(tab.key)} style={{
@@ -554,7 +554,7 @@ export default function Dashboard() {
                             {ev.device_type && <span style={{ fontSize: 11, color: '#888' }}>{ev.device_type === 'mobile' ? '📱' : '🖥️'} {ev.device_type}</span>}
                             {ev.client_ip_city && <span style={{ fontSize: 11, color: '#888' }}>📍 {ev.client_ip_city}</span>}
                             {ev.platform === 'app' && <span style={{ fontSize: 11, color: '#9B59B6', fontWeight: 600 }}>앱</span>}
-                            {chModal.channel === 'unattributed' && ev.referrer && (
+                            {ev.referrer && (
                               <a href={ev.referrer} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                                 style={{ fontSize: 11, color: '#4facfe', textDecoration: 'none', wordBreak: 'break-all' }} title={ev.referrer}>
                                 🔗 {shortReferrer(ev.referrer)}
@@ -600,23 +600,31 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* 유입경로 탭 (자연유입) */}
+                {/* 유입경로 탭 */}
                 {chDetailTab === 'referrers' && (
                   <div>
-                    <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>견적요청 발생 시 유입 경로 ({chDetail.referrerDomains?.length || 0}개)</div>
+                    <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>유입 URL ({chDetail.referrerDomains?.length || 0}개)</div>
                     {(() => {
                       const max = Math.max(...chDetail.referrerDomains.map(d => d.visits), 1)
                       return chDetail.referrerDomains.map(item => {
                         const pct = (item.visits / max * 100).toFixed(1)
                         const convRate = item.visits > 0 ? (item.quotes / item.visits * 100).toFixed(1) : '0.0'
                         return (
-                          <div key={item.domain} style={{ marginBottom: 14 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, marginBottom: 5 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600, background: item.isDirect ? '#f0f0f0' : '#fff3e0', color: item.isDirect ? '#999' : '#e67e22' }}>{item.isDirect ? '직접' : '유입'}</span>
-                                <span style={{ color: '#333', fontWeight: 500 }}>{item.domain}</span>
+                          <div key={item.url} style={{ marginBottom: 14 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 5, gap: 8 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                <span style={{ flexShrink: 0, fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600, background: item.isDirect ? '#f0f0f0' : '#fff3e0', color: item.isDirect ? '#999' : '#e67e22' }}>{item.isDirect ? '직접' : '유입'}</span>
+                                {item.isDirect ? (
+                                  <span style={{ color: '#aaa' }}>(직접유입)</span>
+                                ) : (
+                                  <a href={item.url} target="_blank" rel="noopener noreferrer"
+                                    style={{ color: '#4facfe', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    title={item.url}>
+                                    {shortReferrer(item.url)}
+                                  </a>
+                                )}
                               </div>
-                              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                              <div style={{ flexShrink: 0, display: 'flex', gap: 10, alignItems: 'center' }}>
                                 <span style={{ fontSize: 11, color: '#888' }}>방문 {item.visits}</span>
                                 <span style={{ fontSize: 12, fontWeight: 700 }}>견적 {item.quotes}건</span>
                                 {item.visits > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c' }}>{convRate}%</span>}
