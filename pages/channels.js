@@ -525,19 +525,21 @@ export default function ChannelsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailTab, setDetailTab] = useState('events')
   const inlineDetailRef = useRef(null)
+  const fetchSeq = useRef(0)
 
   const fetchStats = useCallback(async () => {
+    const seq = ++fetchSeq.current
     setLoading(true)
     setContractData(null)  // 기간/플랫폼 바뀌면 계약현황 초기화
     try {
       const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/stats?${params}`)
       const json = await res.json()
-      if (json.success) setData(json)
+      if (json.success && seq === fetchSeq.current) setData(json)
     } catch (e) {
       console.error(e)
     } finally {
-      setLoading(false)
+      if (seq === fetchSeq.current) setLoading(false)
     }
   }, [dates, platform, showStaging])
 
@@ -881,6 +883,47 @@ export default function ChannelsPage() {
             <div style={{ textAlign: 'center', padding: 80, color: '#aaa' }}>데이터가 없습니다</div>
           ) : (
             <>
+            {/* 견적요청 총괄 */}
+            {(() => {
+              const totalQuotes = data.summary.total
+              const channelQuotes = displayChannels
+                .filter(ch => ch.count > 0)
+                .sort((a, b) => b.count - a.count)
+              return (
+                <div style={{
+                  background: 'linear-gradient(135deg, #7b2d00 0%, #f97316 100%)',
+                  borderRadius: 14, padding: '20px 28px',
+                  boxShadow: '0 4px 16px rgba(249,115,22,0.3)', marginBottom: 16,
+                  display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap',
+                }}>
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>📋 견적요청 총괄</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
+                  </div>
+                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 견적요청</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalQuotes.toLocaleString()}건</div>
+                  </div>
+                  {channelQuotes.length > 0 && (
+                    <>
+                      <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                        {channelQuotes.map(ch => (
+                          <div key={ch.channel}>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                              {CHANNEL_LABELS[ch.channel] || ch.channel}
+                            </div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{ch.count.toLocaleString()}건</div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* 광고비 총괄 */}
             {adCosts && Object.keys(adCosts).length > 0 && (() => {
               const totalAdCost = Object.values(adCosts).reduce((s, v) => s + v, 0)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -248,6 +248,7 @@ export default function Dashboard() {
   const [chDetail, setChDetail] = useState(null)
   const [chDetailLoading, setChDetailLoading] = useState(false)
   const [chDetailTab, setChDetailTab] = useState('events')
+  const fetchSeq = useRef(0)
 
   const openChannelModal = useCallback(async (channel, label) => {
     setChDetail(null)
@@ -276,14 +277,15 @@ export default function Dashboard() {
   }, [dates, platform, showStaging])
 
   const fetchStats = useCallback(async () => {
+    const seq = ++fetchSeq.current
     setLoading(true)
     try {
       const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/stats?${params}`)
       const json = await res.json()
-      if (json.success) setData(json)
+      if (json.success && seq === fetchSeq.current) setData(json)
     } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    finally { if (seq === fetchSeq.current) setLoading(false) }
   }, [dates, platform, showStaging])
 
   useEffect(() => { fetchStats() }, [fetchStats])
