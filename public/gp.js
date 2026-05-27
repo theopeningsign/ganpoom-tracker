@@ -76,9 +76,15 @@
       };
     }
 
+    // utm_source 값 정규화 맵 (외부에서 짧게 들어오는 값 → 내부 채널 키)
+    const CHANNEL_NORMALIZE = {
+      'ig': 'instagram_official',
+      'instagram': 'instagram_official',
+    };
+
     function resolveChannel(params) {
       if (params.gclid) return 'google';
-      if (params.utm_source) return params.utm_source;
+      if (params.utm_source) return CHANNEL_NORMALIZE[params.utm_source] || params.utm_source;
       if (params.k_campaign || params.k_adgroup) return 'naver.searchad';
       if (params.jid && params.cid) return 'tenping_web';  // 텐핑 자동 감지 (jid+cid 동시)
       if (params.ref) return 'agency';

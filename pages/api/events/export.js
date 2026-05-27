@@ -45,5 +45,12 @@ export default async function handler(req, res) {
     page++
   }
 
-  return res.status(200).json({ success: true, events: allEvents })
+  // 채널 값 정규화 (DB에 이미 저장된 구버전 값도 통일)
+  const CHANNEL_NORMALIZE = { 'ig': 'instagram_official', 'instagram': 'instagram_official' }
+  const normalizedEvents = allEvents.map(ev => ({
+    ...ev,
+    channel: CHANNEL_NORMALIZE[ev.channel] || ev.channel,
+  }))
+
+  return res.status(200).json({ success: true, events: normalizedEvents })
 }

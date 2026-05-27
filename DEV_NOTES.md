@@ -172,6 +172,11 @@ ganpoom-tracker-main/
 
 ## 📝 개발 이력
 
+### 2026-05 — 인스타그램 채널 키 정규화
+- `gp.js`: `resolveChannel`에 `CHANNEL_NORMALIZE` 맵 추가 — `ig`, `instagram` → `instagram_official`
+- `export.js`: 엑셀 내보내기 시 기존 DB에 쌓인 `ig` 값도 `instagram_official`로 변환 (DB 직접 수정 없이)
+- 이유: 기존 데이터베이스가 `instagram_official` 키로 인식하도록 맞춤
+
 ### 2026-05 — req_id 누락 버그 수정
 - **원인:** Supabase `prevent_duplicate_events` BEFORE INSERT 트리거가 req_id 있는 INSERT를 막아버림
 - **해결:** INSERT 후 `.select('id').maybeSingle()`로 트리거 차단 감지 → fallback UPDATE
