@@ -67,13 +67,61 @@ const RECHECK_BADGE = {
   deleted: { label: '🗑️ 견적 삭제됨', bg: '#f8d7da', color: '#842029', border: '#f5c2c7' },
 }
 
+function fmtMonthDay(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`
+}
+
+function buildSmsTemplate(createdAt) {
+  const date = fmtMonthDay(createdAt)
+  return `안녕하세요. 간판의 품격입니다.
+
+ ${date}에 견적 요청하신 건에
+대해서 안내 문자드립니다.
+
+간판의 품격 파트너스와
+계약진행을 한 경우
+
+서비스 이용내역에
+반영이 되어 있어야
+
+계약보증 및 1년 A/S 보증이 가능합니다.
+
+계약 진행하셨다면
+업체명을 회신주시면
+등록 도와드리겠습니다.
+
+감사합니다.`
+}
+
 function ContractCard({ item, contacted, onContact, onUndo, recheckStatus }) {
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [copiedSms, setCopiedSms] = useState(false)
   const chColor = contacted ? '#aaa' : (CHANNEL_COLORS[item.channel] || '#bbb')
   const chLabel = CHANNEL_LABELS[item.channel] || item.channel
   const statusBadge = !contacted && recheckStatus && RECHECK_BADGE[recheckStatus]
+
+  async function copySms(e) {
+    e.stopPropagation()
+    const text = buildSmsTemplate(item.created_at)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedSms(true)
+      setTimeout(() => setCopiedSms(false), 2000)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = text
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+      setCopiedSms(true)
+      setTimeout(() => setCopiedSms(false), 2000)
+    }
+  }
 
   async function copyPhone(e) {
     e.stopPropagation()
@@ -182,20 +230,36 @@ function ContractCard({ item, contacted, onContact, onUndo, recheckStatus }) {
               <span className="card-customer-name" style={{ fontSize: 14, fontWeight: 700, color: contacted ? '#999' : '#222' }}>{item.customer_name}</span>
             )}
             {item.customer_phone && (
-              <button
-                className="card-phone-btn"
-                onClick={copyPhone}
-                style={{
-                  fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
-                  border: `1px solid ${copied ? '#22c55e' : (contacted ? '#ddd' : '#4facfe')}`,
-                  background: copied ? '#f0fdf4' : (contacted ? '#f5f5f5' : '#f0f8ff'),
-                  color: copied ? '#22c55e' : (contacted ? '#aaa' : '#4facfe'),
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {copied ? '✅ 복사됨!' : `📋 ${item.customer_phone}`}
-              </button>
+              <>
+                <button
+                  className="card-phone-btn"
+                  onClick={copyPhone}
+                  style={{
+                    fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                    border: `1px solid ${copied ? '#22c55e' : (contacted ? '#ddd' : '#4facfe')}`,
+                    background: copied ? '#f0fdf4' : (contacted ? '#f5f5f5' : '#f0f8ff'),
+                    color: copied ? '#22c55e' : (contacted ? '#aaa' : '#4facfe'),
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {copied ? '✅ 복사됨!' : `📋 ${item.customer_phone}`}
+                </button>
+                <button
+                  className="card-sms-btn"
+                  onClick={copySms}
+                  style={{
+                    fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                    border: `1px solid ${copiedSms ? '#22c55e' : (contacted ? '#ddd' : '#f59e0b')}`,
+                    background: copiedSms ? '#f0fdf4' : (contacted ? '#f5f5f5' : '#fffbeb'),
+                    color: copiedSms ? '#22c55e' : (contacted ? '#aaa' : '#d97706'),
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {copiedSms ? '✅ 복사됨!' : '✉️ 문자복사'}
+                </button>
+              </>
             )}
             {!item.customer_name && !item.customer_phone && (
               <span style={{ fontSize: 12, color: '#ccc' }}>정보 없음</span>
