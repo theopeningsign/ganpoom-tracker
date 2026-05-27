@@ -194,6 +194,12 @@ ganpoom-tracker-main/
 - `channels.js` 상단에 파란 배너로 총 광고비 + 채널별 금액 표시
 - 계약현황 초록 배너와 함께 보여 광고비 대비 성과 직관적 비교 가능
 
+### 2026-05 — 유입경로 탭 전체 URL 기반으로 개선
+- `channel-detail.js`: referrer_domain → referrer 전체 URL 기반 집계 (글 단위 식별 가능)
+- 유입경로 탭 노출 채널 확대: 유료 검색광고(naver.searchad, naver_powercontents, google, google.adwords) 제외한 모든 채널
+- naver_blog_official, agency(CPA), tenping_web, instagram_official, unattributed 등 포함
+- URL 클릭 시 해당 페이지로 이동, shortReferrer로 길이 자동 축약 표시
+
 ---
 
 ## 🚧 미완료 / 향후 과제
