@@ -286,6 +286,13 @@ function ContractCard({ item, contacted, onContact, onUndo, recheckStatus }) {
             background: chColor + '20', color: chColor,
           }}>{chLabel}</span>
 
+          {item.from_xlsx && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+              background: '#ede9fe', color: '#7c3aed',
+            }}>🎨 스타일시공</span>
+          )}
+
           <div className="card-partner-count" style={{ fontSize: 12, color: '#aaa' }}>
             업체 {item.consultation.length}개
           </div>
