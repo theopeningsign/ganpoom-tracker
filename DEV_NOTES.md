@@ -260,10 +260,9 @@ CREATE TABLE unconfirmed_status (
   - 가이드: `회원가입-트래커-누락-수정-가이드.md`
 
 ### 중기
-- [ ] 스타일맵 견적 req_id 연동
-  - `backend-master/routes/apis/authApi.js` `style_rfp_estimate` 응답에 `req_id: result.insertId` 추가
-  - `ganpoomreact/ConceptModal.js`에 GanpoomTracker 직접 호출 추가
-  - 가이드: `스타일맵-견적요청-req_id-트래킹-가이드.md`
+- [x] 스타일맵 견적 req_id 연동 (완료 확인)
+  - `airbridge.ecommerce.order.completed` 이벤트에 req_id 정상 저장 확인
+  - QUOTE_EVENTS에 이미 포함되어 미확인 목록에 자동 집계 중
 
 ### 장기 (최종 목표)
 - [ ] 에어브릿지 SDK 완전 제거
