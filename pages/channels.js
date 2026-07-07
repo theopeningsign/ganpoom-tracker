@@ -125,7 +125,7 @@ function shortReferrer(url) {
 }
 
 // ─── 채널 상세 패널 (공통 컴포넌트) ──────────────────────────────────────────
-function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, isInline }) {
+function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, dates, isInline }) {
   if (!selectedChannel || !selectedData) return null
   const color = CHANNEL_COLORS[selectedChannel] || '#bbb'
 
@@ -287,8 +287,36 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
           {/* 키워드 탭 */}
           {detailTab === 'keywords' && (
             <div>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
-                견적요청을 만든 키워드 ({detail.keywords.length}개)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: '#888' }}>
+                  견적요청을 만든 키워드 ({detail.keywords.length}개)
+                </div>
+                {detail.keywords.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const sd = (dates?.startDate || '').replace(/-/g, '')
+                      const ed = (dates?.endDate || '').replace(/-/g, '')
+                      const chLabel = (CHANNEL_LABELS[selectedChannel] || selectedChannel)
+                      const title = `간판의품격 키워드분석 - ${chLabel} ( ${sd} - ${ed} )`
+                      const headers = ['키워드', '소스', '방문수', '견적건수', '전환율(%)']
+                      const rows = detail.keywords.map(kw => {
+                        const conv = kw.visits > 0 ? parseFloat(((kw.quotes / kw.visits) * 100).toFixed(1)) : 0
+                        return [kw.keyword, kw.source === 'naver' ? '네이버' : '구글', kw.visits, kw.quotes, conv]
+                      })
+                      const aoa = [[title], headers, ...rows]
+                      const ws = XLSX.utils.aoa_to_sheet(aoa)
+                      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } }]
+                      ws['!cols'] = [{ wch: 30 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 12 }]
+                      const wb = XLSX.utils.book_new()
+                      XLSX.utils.book_append_sheet(wb, ws, '키워드분석')
+                      XLSX.writeFile(wb, `키워드분석_${chLabel}_${sd}_${ed}.xlsx`)
+                    }}
+                    style={{
+                      fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 6,
+                      border: '1px solid #d0d0d0', background: '#fff', color: '#333', cursor: 'pointer',
+                    }}
+                  >📥 엑셀 다운로드</button>
+                )}
               </div>
               {detail.keywords.length === 0 ? (
                 <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: 30 }}>키워드 데이터 없음</div>
@@ -719,7 +747,7 @@ export default function ChannelsPage() {
     ? displayChannels.find(c => c.channel === selectedChannel)
     : null
 
-  const detailPanelProps = { selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent }
+  const detailPanelProps = { selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, dates }
 
   return (
     <PasswordProtection>

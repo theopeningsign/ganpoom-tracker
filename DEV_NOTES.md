@@ -250,6 +250,13 @@ CREATE TABLE unconfirmed_status (
 - naver_blog_official, agency(CPA), tenping_web, instagram_official, unattributed 등 포함
 - URL 클릭 시 해당 페이지로 이동, shortReferrer로 길이 자동 축약 표시
 
+### 2026-05 — 채널 상세 키워드 탭 엑셀 다운로드 추가
+- `channels.js` `DetailPanel` 키워드 탭 우측 상단에 `📥 엑셀 다운로드` 버튼 추가
+- 컬럼: 키워드 / 소스(네이버·구글) / 방문수 / 견적건수 / 전환율(%) — 화면과 동일, 견적건수 순 정렬
+- 파일명: `키워드분석_{채널명}_{시작일}_{종료일}.xlsx`
+- 서버 수정 없음 (기존 channel-detail API의 keywords 데이터를 그대로 XLSX.writeFile)
+- `detailPanelProps`에 `dates` 추가로 전달
+
 ---
 
 ## 🚧 미완료 / 향후 과제
