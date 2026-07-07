@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     let pg = 0
     while (true) {
       const { data: pageData, error: pageError } = await applyFilters(
-        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term, agent_id, referrer, referrer_domain')
+        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term, agent_id, referrer, referrer_domain, req_id')
       ).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
       if (pageError) { console.error('allEvents error:', pageError); break }
       allEvents = allEvents.concat(pageData || [])
@@ -87,12 +87,14 @@ export default async function handler(req, res) {
       // 키워드: session.start만 방문으로 카운트 (견적 이벤트는 quotes만)
       const kw = ev.k_keyword || ev.utm_term
       if (kw) {
-        if (!keywords[kw]) keywords[kw] = { keyword: kw, visits: 0, quotes: 0, source: ev.k_keyword ? 'naver' : 'google' }
+        if (!keywords[kw]) keywords[kw] = { keyword: kw, visits: 0, quotes: 0, source: ev.k_keyword ? 'naver' : 'google', _reqIds: new Set() }
         if (ev.event_category === 'session.start') {
           keywords[kw].visits++
         }
         if (QUOTE_EVENTS.includes(ev.event_category)) {
           keywords[kw].quotes++
+          // 계약 교집합용 req_id 수집 (견적 이벤트만)
+          if (ev.req_id) keywords[kw]._reqIds.add(Number(ev.req_id))
         }
       }
     })
@@ -107,6 +109,7 @@ export default async function handler(req, res) {
 
     const keywordList = Object.values(keywords)
       .sort((a, b) => b.quotes - a.quotes || b.visits - a.visits)
+      .map(k => ({ keyword: k.keyword, visits: k.visits, quotes: k.quotes, source: k.source, reqIds: [...k._reqIds] }))
 
     // referrer 전체 URL 집계 (모든 채널)
     let referrerDomains = []

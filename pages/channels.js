@@ -125,9 +125,15 @@ function shortReferrer(url) {
 }
 
 // ─── 채널 상세 패널 (공통 컴포넌트) ──────────────────────────────────────────
-function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, dates, isInline }) {
+function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, dates, contractData, isInline }) {
   if (!selectedChannel || !selectedData) return null
   const color = CHANNEL_COLORS[selectedChannel] || '#bbb'
+
+  // 계약 교집합용: 이 채널에서 계약된 req_id 집합 (계약현황 조회 시에만 존재)
+  const hasContractData = !!contractData
+  const contractedSet = new Set(
+    (contractData && contractData.byChannel && contractData.byChannel[selectedChannel] && contractData.byChannel[selectedChannel].reqIds) || []
+  )
 
   return (
     <div style={{
@@ -290,6 +296,7 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ fontSize: 12, color: '#888' }}>
                   견적요청을 만든 키워드 ({detail.keywords.length}개)
+                  {!hasContractData && <span style={{ marginLeft: 8, color: '#bbb' }}>· 계약현황 조회하면 계약건수도 포함</span>}
                 </div>
                 {detail.keywords.length > 0 && (
                   <button
@@ -299,14 +306,21 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
                       const chLabel = (CHANNEL_LABELS[selectedChannel] || selectedChannel)
                       const title = `간판의품격 키워드분석 - ${chLabel} ( ${sd} - ${ed} )`
                       const headers = ['키워드', '소스', '방문수', '견적건수', '전환율(%)']
+                      if (hasContractData) headers.push('계약건수', '견적→계약(%)')
                       const rows = detail.keywords.map(kw => {
                         const conv = kw.visits > 0 ? parseFloat(((kw.quotes / kw.visits) * 100).toFixed(1)) : 0
-                        return [kw.keyword, kw.source === 'naver' ? '네이버' : '구글', kw.visits, kw.quotes, conv]
+                        const row = [kw.keyword, kw.source === 'naver' ? '네이버' : '구글', kw.visits, kw.quotes, conv]
+                        if (hasContractData) {
+                          const contracts = (kw.reqIds || []).filter(id => contractedSet.has(id)).length
+                          const c2q = kw.quotes > 0 ? parseFloat(((contracts / kw.quotes) * 100).toFixed(1)) : 0
+                          row.push(contracts, c2q)
+                        }
+                        return row
                       })
                       const aoa = [[title], headers, ...rows]
                       const ws = XLSX.utils.aoa_to_sheet(aoa)
                       ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } }]
-                      ws['!cols'] = [{ wch: 30 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 12 }]
+                      ws['!cols'] = headers.map((h, i) => ({ wch: i === 0 ? 30 : 12 }))
                       const wb = XLSX.utils.book_new()
                       XLSX.utils.book_append_sheet(wb, ws, '키워드분석')
                       XLSX.writeFile(wb, `키워드분석_${chLabel}_${sd}_${ed}.xlsx`)
@@ -340,6 +354,12 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
                         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                           <span style={{ fontSize: 11, color: '#888' }}>방문 {kw.visits}</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#333' }}>견적 {kw.quotes}건</span>
+                          {hasContractData && (
+                            <span style={{
+                              fontSize: 12, fontWeight: 700,
+                              color: (kw.reqIds || []).filter(id => contractedSet.has(id)).length > 0 ? '#8e44ad' : '#ccc'
+                            }}>계약 {(kw.reqIds || []).filter(id => contractedSet.has(id)).length}건</span>
+                          )}
                           <span style={{
                             fontSize: 11, fontWeight: 700,
                             color: parseFloat(convRate) >= 5 ? '#27ae60' : parseFloat(convRate) >= 2 ? '#f39c12' : '#e74c3c'
@@ -747,7 +767,7 @@ export default function ChannelsPage() {
     ? displayChannels.find(c => c.channel === selectedChannel)
     : null
 
-  const detailPanelProps = { selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, dates }
+  const detailPanelProps = { selectedChannel, selectedData, detail, detailLoading, detailTab, setDetailTab, setSelectedChannel, setSelectedEvent, dates, contractData }
 
   return (
     <PasswordProtection>

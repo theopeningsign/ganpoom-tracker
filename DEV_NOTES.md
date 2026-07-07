@@ -257,6 +257,14 @@ CREATE TABLE unconfirmed_status (
 - 서버 수정 없음 (기존 channel-detail API의 keywords 데이터를 그대로 XLSX.writeFile)
 - `detailPanelProps`에 `dates` 추가로 전달
 
+### 2026-05 — 키워드별 계약 전환 집계 추가 (엑셀 + 화면)
+- **연결 원리:** `channel-detail.js`가 키워드별 견적 `req_id` 목록(`reqIds`)을 같이 반환 → 프론트에서 `contracts/data`의 채널별 계약 `req_id`(`byChannel[ch].reqIds`)와 **교집합** = 키워드별 계약건수. **관리자 API 추가 호출 없음** (계약현황 조회 시 이미 받은 데이터 재사용).
+- `channel-detail.js`: paged select에 `req_id` 추가, 키워드 집계 시 견적 이벤트의 req_id를 `_reqIds` Set에 수집 → keywordList에 `reqIds` 배열로 반환.
+- `channels.js`: `detailPanelProps`에 `contractData` 전달. `DetailPanel`에서 `contractedSet`(해당 채널 계약 req_id) 계산.
+  - 화면: 계약현황 조회했으면 각 키워드에 `계약 N건` 보라 배지 표시.
+  - 엑셀: 계약현황 조회했으면 `계약건수`, `견적→계약(%)` 컬럼 추가. 안 했으면 안내 문구 + 기존 컬럼만.
+- **주의:** 계약건수는 "계약현황 조회" 선행 필수 (contractData 없으면 계약 컬럼 미표시).
+
 ---
 
 ## 🚧 미완료 / 향후 과제
