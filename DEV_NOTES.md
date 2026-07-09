@@ -257,6 +257,14 @@ CREATE TABLE unconfirmed_status (
 - 서버 수정 없음 (기존 channel-detail API의 keywords 데이터를 그대로 XLSX.writeFile)
 - `detailPanelProps`에 `dates` 추가로 전달
 
+### 2026-05 — 채널분석 유입경로 탭 대시보드와 동기화 (버그 2개 수정)
+- **증상:** 채널분석에서 (a) 자연유입 외 무료채널은 유입경로 탭 자체가 안 뜸, (b) 자연유입은 탭은 떠도 URL이 빈값.
+- **원인:** 채널분석(`channels.js`)이 옛날 코드로 남아있었음. 대시보드(`index.js`)는 정답 코드였음.
+  - 탭 노출 조건: `selectedChannel === 'unattributed'`만 허용 → 유료 검색광고만 제외하는 조건으로 변경 (대시보드와 동일)
+  - 렌더링: `item.domain` 참조(서버엔 없는 필드) → `item.url`로 수정 + 클릭 가능한 링크 + isDirect 처리 (대시보드와 동일)
+- 서버 수정 없음 (channel-detail의 referrerDomains는 원래 모든 채널에 대해 `url` 필드로 내려주고 있었음).
+- 사이드이펙트: 다른 페이지/앱웹뷰/봇SSR/DB 없음 (트래커 프론트 표시 로직만).
+
 ### 2026-05 — 키워드별 계약 전환 집계 추가 (엑셀 + 화면)
 - **연결 원리:** `channel-detail.js`가 키워드별 견적 `req_id` 목록(`reqIds`)을 같이 반환 → 프론트에서 `contracts/data`의 채널별 계약 `req_id`(`byChannel[ch].reqIds`)와 **교집합** = 키워드별 계약건수. **관리자 API 추가 호출 없음** (계약현황 조회 시 이미 받은 데이터 재사용).
 - `channel-detail.js`: paged select에 `req_id` 추가, 키워드 집계 시 견적 이벤트의 req_id를 `_reqIds` Set에 수집 → keywordList에 `reqIds` 배열로 반환.
