@@ -244,6 +244,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [categoryModal, setCategoryModal] = useState(null) // { category, label, data }
+  const [visitorModal, setVisitorModal] = useState(false) // 방문자 사람/봇 분해 모달 (2026-08-03)
   const [modalLoading, setModalLoading] = useState(false)
   const [chModal, setChModal] = useState(null) // { channel, label }
   const [chDetail, setChDetail] = useState(null)
@@ -426,6 +427,48 @@ export default function Dashboard() {
         </Link>
       </div>
     </div>
+    {/* 방문자 사람/봇 분해 모달 (2026-08-03) */}
+    {visitorModal && data && (() => {
+      const human = data.summary.totalSessions ?? 0
+      const bot = data.summary.botSessions ?? 0
+      const totalV = human + bot
+      const rows = [
+        { label: '총 방문', value: totalV, color: '#1a1a1a', desc: '사람 + 봇 전체' },
+        { label: '👤 사람', value: human, color: '#16a085', desc: totalV > 0 ? `${((human / totalV) * 100).toFixed(1)}% — 모든 통계는 이 숫자 기준` : '모든 통계는 이 숫자 기준' },
+        { label: '🤖 봇', value: bot, color: '#7f8c8d', desc: totalV > 0 ? `${((bot / totalV) * 100).toFixed(1)}% — 구글봇 등 크롤러, 집계 제외` : '구글봇 등 크롤러, 집계 제외' },
+      ]
+      return (
+        <div
+          onClick={() => setVisitorModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="gp-modal-box"
+            style={{ background: 'white', borderRadius: 16, width: 420, display: 'flex', flexDirection: 'column', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}
+          >
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>방문자 분석</div>
+                <div style={{ fontSize: 12, color: '#888', marginTop: 3 }}>{dates.startDate} ~ {dates.endDate}</div>
+              </div>
+              <button onClick={() => setVisitorModal(false)} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: '#aaa', lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ padding: '8px 0 16px' }}>
+              {rows.map(r => (
+                <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px', borderBottom: '1px solid #fafafa' }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: r.color }}>{r.label}</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{r.desc}</div>
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: r.color }}>{r.value.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    })()}
     {/* 전환 유형 상세 모달 */}
     {categoryModal && (
       <div
@@ -770,7 +813,7 @@ export default function Dashboard() {
                 <StatCard label="블로그 / SNS" value={data.summary.blog} sub="Blog" color="#00C73C" />
                 <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" />
                 <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" onClick={() => openCategoryModal('airbridge.user.signup', '회원가입')} />
-                <StatCard label="봇 방문 (집계 제외)" value={data.summary.botSessions ?? 0} sub="Bot" color="#7f8c8d" />
+                <StatCard label="방문자 (사람)" value={data.summary.totalSessions ?? 0} sub="Visitors" color="#16a085" onClick={() => setVisitorModal(true)} />
               </div>
 
               {/* 채널 테이블 + 일별 추이 */}

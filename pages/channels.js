@@ -564,6 +564,23 @@ function DetailPanel({ selectedChannel, selectedData, detail, detailLoading, det
   )
 }
 
+// ─── 증감 배지 (기간 비교용, 2026-08-03) ─────────────────────────────────────
+function DeltaBadge({ cur, prev, suffix = '', light = false }) {
+  if (prev === null || prev === undefined) return null
+  const diff = (cur || 0) - (prev || 0)
+  const pct = prev > 0 ? ((diff / prev) * 100).toFixed(1) : null
+  const up = light ? '#7bed9f' : '#27ae60'
+  const down = light ? '#ff7675' : '#e74c3c'
+  const flat = light ? 'rgba(255,255,255,0.6)' : '#999'
+  const color = diff > 0 ? up : diff < 0 ? down : flat
+  const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '—'
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, color }}>
+      {arrow} {Math.abs(diff).toLocaleString()}{suffix}{pct !== null ? ` (${diff >= 0 ? '+' : ''}${pct}%)` : ''}
+    </span>
+  )
+}
+
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 export default function ChannelsPage() {
   const [dates, setDates] = useState(getDefaultDates)       // 실제 조회 기간
@@ -576,6 +593,11 @@ export default function ChannelsPage() {
   const [adCosts, setAdCosts] = useState({}) // { 'event_channel': amount }
   const [contractData, setContractData] = useState(null)  // { byChannel: { ch: { contracts, totalAmount } } }
   const [contractLoading, setContractLoading] = useState(false)
+  const [compareMode, setCompareMode] = useState(false)              // 비교 모드 (2026-08-03)
+  const [compareInput, setCompareInput] = useState(getDefaultDates)  // 비교 기간 입력값
+  const [compareDates, setCompareDates] = useState(null)             // 실제 비교 조회 기간
+  const [compareData, setCompareData] = useState(null)               // 비교 기간 통계
+  const [compareLoading, setCompareLoading] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [detail, setDetail] = useState(null)
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -583,6 +605,23 @@ export default function ChannelsPage() {
   const [detailTab, setDetailTab] = useState('events')
   const inlineDetailRef = useRef(null)
   const fetchSeq = useRef(0)
+
+  // 비교 기간 통계 조회 (2026-08-03): 봇 제외 기준은 본 조회와 동일
+  useEffect(() => {
+    if (!compareDates) { setCompareData(null); return }
+    let cancelled = false
+    ;(async () => {
+      setCompareLoading(true)
+      try {
+        const params = new URLSearchParams({ startDate: compareDates.startDate, endDate: compareDates.endDate, platform, staging: showStaging ? 'true' : 'false' })
+        const res = await fetch(`/api/events/stats?${params}`)
+        const json = await res.json()
+        if (!cancelled && json.success) setCompareData(json)
+      } catch (e) { console.error(e) }
+      finally { if (!cancelled) setCompareLoading(false) }
+    })()
+    return () => { cancelled = true }
+  }, [compareDates, platform, showStaging])
 
   const fetchStats = useCallback(async () => {
     const seq = ++fetchSeq.current
@@ -916,6 +955,35 @@ export default function ChannelsPage() {
                 background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600
               }}>조회</button>
 
+              {/* 기간 비교 (2026-08-03) */}
+              <button onClick={() => setCompareMode(m => {
+                const next = !m
+                if (!next) setCompareDates(null)
+                return next
+              })} style={{
+                padding: '8px 14px', borderRadius: 8, border: '1px solid',
+                borderColor: compareMode ? '#9b59b6' : '#ddd',
+                background: compareMode ? '#f5eef8' : 'white',
+                color: compareMode ? '#9b59b6' : '#888',
+                fontSize: 13, cursor: 'pointer', fontWeight: 600
+              }}>🔁 비교</button>
+              {compareMode && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f5eef8', borderRadius: 8, padding: '4px 8px' }}>
+                  <span style={{ fontSize: 12, color: '#9b59b6', fontWeight: 800 }}>VS</span>
+                  <input type="date" value={compareInput.startDate}
+                    onChange={e => setCompareInput(p => ({ ...p, startDate: e.target.value }))}
+                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d7bde2', fontSize: 12 }} />
+                  <span style={{ color: '#9b59b6' }}>~</span>
+                  <input type="date" value={compareInput.endDate}
+                    onChange={e => setCompareInput(p => ({ ...p, endDate: e.target.value }))}
+                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d7bde2', fontSize: 12 }} />
+                  <button onClick={() => setCompareDates({ ...compareInput })} style={{
+                    padding: '6px 12px', borderRadius: 6, border: 'none',
+                    background: '#9b59b6', color: 'white', fontSize: 12, cursor: 'pointer', fontWeight: 600
+                  }}>{compareLoading ? '⏳' : '비교 조회'}</button>
+                </div>
+              )}
+
               <button onClick={fetchContractData} disabled={!data || contractLoading} style={{
                 padding: '8px 14px', borderRadius: 8, border: '1px solid #27ae60',
                 background: contractData ? '#f0fff4' : (data ? 'white' : '#f5f5f5'),
@@ -944,6 +1012,9 @@ export default function ChannelsPage() {
             {/* 견적요청 총괄 */}
             {(() => {
               const totalQuotes = data.summary.total
+              const humanV = data.summary.totalSessions ?? 0
+              const botV = data.summary.botSessions ?? 0
+              const cmp = compareData ? compareData.summary : null
               const channelQuotes = displayChannels
                 .filter(ch => ch.count > 0)
                 .sort((a, b) => b.count - a.count)
@@ -957,21 +1028,25 @@ export default function ChannelsPage() {
                   <div style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>📋 견적요청 총괄</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
+                    {compareDates && (
+                      <div style={{ fontSize: 11, color: '#d7bde2', marginTop: 2 }}>vs {compareDates.startDate} ~ {compareDates.endDate}</div>
+                    )}
                   </div>
                   <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
                   <div style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 견적요청</div>
                     <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalQuotes.toLocaleString()}건</div>
+                    {cmp && <DeltaBadge cur={totalQuotes} prev={cmp.total} suffix="건" light />}
                   </div>
-                  {(data.summary.botSessions ?? 0) > 0 && (
-                    <>
-                      <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                      <div style={{ marginRight: 40 }}>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>🤖 봇 방문 (집계 제외)</div>
-                        <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{(data.summary.botSessions ?? 0).toLocaleString()}회</div>
-                      </div>
-                    </>
-                  )}
+                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div style={{ marginRight: 40 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 방문 {(humanV + botV).toLocaleString()}회</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                      <span style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>👤 {humanV.toLocaleString()}</span>
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>🤖 봇 {botV.toLocaleString()} 제외</span>
+                    </div>
+                    {cmp && <DeltaBadge cur={humanV} prev={cmp.totalSessions ?? 0} suffix="명" light />}
+                  </div>
                   {channelQuotes.length > 0 && (
                     <>
                       <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
@@ -1080,6 +1155,9 @@ export default function ChannelsPage() {
                   const color = CHANNEL_COLORS[ch.channel] || '#bbb'
                   const label = CHANNEL_LABELS[ch.channel] || ch.channel
                   const isSelected = selectedChannel === ch.channel
+                  const cmpCh = compareData
+                    ? ((compareData.channelStats || []).find(c => c.channel === ch.channel) || { sessions: 0, count: 0 })
+                    : null
 
                   return (
                     <div key={ch.channel}>
@@ -1106,12 +1184,14 @@ export default function ChannelsPage() {
                             {ch.sessions > 0 && (
                               <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: 18, fontWeight: 700, color: '#555' }}>{ch.sessions.toLocaleString()}</div>
-                                <div style={{ fontSize: 11, color: '#aaa' }}>방문</div>
+                                <div style={{ fontSize: 11, color: '#aaa' }}>방문 (사람)</div>
+                                {cmpCh && <DeltaBadge cur={ch.sessions} prev={cmpCh.sessions} />}
                               </div>
                             )}
                             <div style={{ textAlign: 'right' }}>
                               <div style={{ fontSize: 22, fontWeight: 700 }}>{ch.count.toLocaleString()}</div>
                               <div style={{ fontSize: 12, color: '#aaa' }}>견적요청</div>
+                              {cmpCh && <DeltaBadge cur={ch.count} prev={cmpCh.count} />}
                             </div>
                             <div style={{ textAlign: 'right', minWidth: 58 }}>
                               {ch.conversionRate !== null ? (
