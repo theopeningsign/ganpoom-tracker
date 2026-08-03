@@ -5,6 +5,7 @@ import {
 } from 'recharts'
 import * as XLSX from 'xlsx'
 import PasswordProtection from '../components/PasswordProtection'
+import DateRangePicker from '../components/DateRangePicker'
 
 const CHANNEL_LABELS = {
   'naver.searchad': '네이버 검색광고',
@@ -815,19 +816,11 @@ export default function Dashboard() {
                 ))}
               </div>
 
-              {/* 직접 날짜 입력 — inputDates만 업데이트, 조회 버튼 눌러야 반영 */}
-              <input type="date" value={inputDates.startDate}
-                onChange={e => { setInputDates(p => ({ ...p, startDate: e.target.value })); setActivePreset('') }}
-                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
-              <span style={{ color: '#888' }}>~</span>
-              <input type="date" value={inputDates.endDate}
-                onChange={e => { setInputDates(p => ({ ...p, endDate: e.target.value })); setActivePreset('') }}
-                style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13 }} />
-
-              <button onClick={() => setDates({ ...inputDates })}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
-                조회
-              </button>
+              {/* 기간 선택 — 달력 하나에서 시작일·종료일 연속 클릭, 적용 즉시 조회 (2026-08-03) */}
+              <DateRangePicker
+                value={dates}
+                onApply={r => { setDates(r); setInputDates(r); setActivePreset('') }}
+              />
 
               {/* 기간 비교 (2026-08-03) */}
               <button onClick={() => setCompareMode(m => {
@@ -844,17 +837,13 @@ export default function Dashboard() {
               {compareMode && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f5eef8', borderRadius: 8, padding: '4px 8px' }}>
                   <span style={{ fontSize: 12, color: '#9b59b6', fontWeight: 800 }}>VS</span>
-                  <input type="date" value={compareInput.startDate}
-                    onChange={e => setCompareInput(p => ({ ...p, startDate: e.target.value }))}
-                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d7bde2', fontSize: 12 }} />
-                  <span style={{ color: '#9b59b6' }}>~</span>
-                  <input type="date" value={compareInput.endDate}
-                    onChange={e => setCompareInput(p => ({ ...p, endDate: e.target.value }))}
-                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d7bde2', fontSize: 12 }} />
-                  <button onClick={() => setCompareDates({ ...compareInput })} style={{
-                    padding: '6px 12px', borderRadius: 6, border: 'none',
-                    background: '#9b59b6', color: 'white', fontSize: 12, cursor: 'pointer', fontWeight: 600
-                  }}>{compareLoading ? '⏳' : '비교 조회'}</button>
+                  <DateRangePicker
+                    value={compareDates}
+                    accent="#9b59b6"
+                    placeholder="비교 기간 선택"
+                    onApply={r => { setCompareInput(r); setCompareDates(r) }}
+                  />
+                  {compareLoading && <span style={{ fontSize: 12, color: '#9b59b6' }}>⏳</span>}
                 </div>
               )}
               <button onClick={exportExcel} disabled={exporting}
