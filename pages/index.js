@@ -167,7 +167,21 @@ function getDefaultDates() {
   return getDateRange('today')
 }
 
-function StatCard({ label, value, sub, color, onClick }) {
+// 증감 배지 (기간 비교용, 2026-08-03)
+function DeltaBadge({ cur, prev, suffix = '' }) {
+  if (prev === null || prev === undefined) return null
+  const diff = (cur || 0) - (prev || 0)
+  const pct = prev > 0 ? ((diff / prev) * 100).toFixed(1) : null
+  const color = diff > 0 ? '#27ae60' : diff < 0 ? '#e74c3c' : '#999'
+  const arrow = diff > 0 ? '\u25b2' : diff < 0 ? '\u25bc' : '\u2014'
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, color }}>
+      {arrow} {Math.abs(diff).toLocaleString()}{suffix}{pct !== null ? ` (${diff >= 0 ? '+' : ''}${pct}%)` : ''}
+    </span>
+  )
+}
+
+function StatCard({ label, value, sub, color, onClick, delta }) {
   return (
     <div
       onClick={onClick}
@@ -183,6 +197,7 @@ function StatCard({ label, value, sub, color, onClick }) {
       <div style={{ fontSize: 13, color: '#888', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 32, fontWeight: 700, color: '#1a1a1a' }}>{value?.toLocaleString() ?? 0}</div>
       {sub && <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>{sub}</div>}
+      {delta && <div style={{ marginTop: 4 }}>{delta}</div>}
       {onClick && <div style={{ fontSize: 11, color: color, marginTop: 6, fontWeight: 600 }}>채널별 보기 →</div>}
     </div>
   )
@@ -237,6 +252,11 @@ const DATE_PRESETS = [
 export default function Dashboard() {
   const [dates, setDates] = useState(getDefaultDates)       // 실제 조회 기간
   const [inputDates, setInputDates] = useState(getDefaultDates) // 날짜 input 표시값
+  const [compareMode, setCompareMode] = useState(false)              // 비교 모드 (2026-08-03)
+  const [compareInput, setCompareInput] = useState(getDefaultDates)  // 비교 기간 입력값
+  const [compareDates, setCompareDates] = useState(null)             // 실제 비교 조회 기간
+  const [compareData, setCompareData] = useState(null)               // 비교 기간 통계
+  const [compareLoading, setCompareLoading] = useState(false)
   const [activePreset, setActivePreset] = useState('today')
   const [platform, setPlatform] = useState('all')
   const [showStaging, setShowStaging] = useState(false)
@@ -277,6 +297,23 @@ export default function Dashboard() {
     } catch (e) { console.error(e) }
     finally { setModalLoading(false) }
   }, [dates, platform, showStaging])
+
+  // 비교 기간 통계 조회 (2026-08-03): 봇 제외 기준은 본 조회와 동일
+  useEffect(() => {
+    if (!compareDates) { setCompareData(null); return }
+    let cancelled = false
+    ;(async () => {
+      setCompareLoading(true)
+      try {
+        const params = new URLSearchParams({ startDate: compareDates.startDate, endDate: compareDates.endDate, platform, staging: showStaging ? 'true' : 'false' })
+        const res = await fetch(`/api/events/stats?${params}`)
+        const json = await res.json()
+        if (!cancelled && json.success) setCompareData(json)
+      } catch (e) { console.error(e) }
+      finally { if (!cancelled) setCompareLoading(false) }
+    })()
+    return () => { cancelled = true }
+  }, [compareDates, platform, showStaging])
 
   const fetchStats = useCallback(async () => {
     const seq = ++fetchSeq.current
@@ -735,6 +772,9 @@ export default function Dashboard() {
             <div>
               <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>대시보드</h1>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 견적요청 현황</p>
+              {compareDates && (
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#9b59b6', fontWeight: 600 }}>🔁 {compareDates.startDate} ~ {compareDates.endDate} 대비 증감 표시 중</p>
+              )}
             </div>
             <div className="gp-controls" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* 스테이징 토글 */}
@@ -788,6 +828,35 @@ export default function Dashboard() {
                 style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4facfe', color: 'white', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                 조회
               </button>
+
+              {/* 기간 비교 (2026-08-03) */}
+              <button onClick={() => setCompareMode(m => {
+                const next = !m
+                if (!next) setCompareDates(null)
+                return next
+              })} style={{
+                padding: '8px 14px', borderRadius: 8, border: '1px solid',
+                borderColor: compareMode ? '#9b59b6' : '#ddd',
+                background: compareMode ? '#f5eef8' : 'white',
+                color: compareMode ? '#9b59b6' : '#888',
+                fontSize: 13, cursor: 'pointer', fontWeight: 600
+              }}>🔁 비교</button>
+              {compareMode && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f5eef8', borderRadius: 8, padding: '4px 8px' }}>
+                  <span style={{ fontSize: 12, color: '#9b59b6', fontWeight: 800 }}>VS</span>
+                  <input type="date" value={compareInput.startDate}
+                    onChange={e => setCompareInput(p => ({ ...p, startDate: e.target.value }))}
+                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d7bde2', fontSize: 12 }} />
+                  <span style={{ color: '#9b59b6' }}>~</span>
+                  <input type="date" value={compareInput.endDate}
+                    onChange={e => setCompareInput(p => ({ ...p, endDate: e.target.value }))}
+                    style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d7bde2', fontSize: 12 }} />
+                  <button onClick={() => setCompareDates({ ...compareInput })} style={{
+                    padding: '6px 12px', borderRadius: 6, border: 'none',
+                    background: '#9b59b6', color: 'white', fontSize: 12, cursor: 'pointer', fontWeight: 600
+                  }}>{compareLoading ? '⏳' : '비교 조회'}</button>
+                </div>
+              )}
               <button onClick={exportExcel} disabled={exporting}
                 style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#217346', color: 'white', fontSize: 13, cursor: 'pointer' }}>
                 📊 성과분석
@@ -805,16 +874,22 @@ export default function Dashboard() {
             <div style={{ textAlign: 'center', padding: 80, color: '#aaa' }}>데이터가 없습니다</div>
           ) : (
             <>
-              {/* 요약 카드 */}
+              {/* 요약 카드 (비교 시 증감 표시, 2026-08-03) */}
+              {(() => {
+                const cmp = compareData ? compareData.summary : null
+                const d = (cur, key) => (cmp ? <DeltaBadge cur={cur} prev={cmp[key] ?? 0} /> : null)
+                return (
               <div className="gp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 16, marginBottom: 28 }}>
-                <StatCard label="전체 견적요청" value={data.summary.total} color="#4facfe" />
-                <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" />
-                <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" />
-                <StatCard label="블로그 / SNS" value={data.summary.blog} sub="Blog" color="#00C73C" />
-                <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" />
-                <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" onClick={() => openCategoryModal('airbridge.user.signup', '회원가입')} />
-                <StatCard label="방문자 (사람)" value={data.summary.totalSessions ?? 0} sub="Visitors" color="#16a085" onClick={() => setVisitorModal(true)} />
+                <StatCard label="전체 견적요청" value={data.summary.total} color="#4facfe" delta={d(data.summary.total, 'total')} />
+                <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" delta={d(data.summary.paid, 'paid')} />
+                <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" delta={d(data.summary.organic, 'organic')} />
+                <StatCard label="블로그 / SNS" value={data.summary.blog} sub="Blog" color="#00C73C" delta={d(data.summary.blog, 'blog')} />
+                <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" delta={d(data.summary.cpa, 'cpa')} />
+                <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" onClick={() => openCategoryModal('airbridge.user.signup', '회원가입')} delta={d(data.summary.signup, 'signup')} />
+                <StatCard label="방문자 (사람)" value={data.summary.totalSessions ?? 0} sub="Visitors" color="#16a085" onClick={() => setVisitorModal(true)} delta={d(data.summary.totalSessions ?? 0, 'totalSessions')} />
               </div>
+                )
+              })()}
 
               {/* 채널 테이블 + 일별 추이 */}
               <div className="gp-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
