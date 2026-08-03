@@ -835,6 +835,13 @@ export default function ChannelsPage() {
           .ch-detail-inline { display: block !important; }
           .ch-card-row { flex-wrap: wrap !important; gap: 8px !important; }
           .ch-card-stats { gap: 12px !important; }
+          /* 총괄 배너 모바일 정돈 (2026-08-03): 가로 나열 → 2열 그리드 */
+          .ch-banner { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 14px !important; padding: 16px 18px !important; }
+          .ch-banner-div { display: none !important; }
+          .ch-banner-stat { margin-right: 0 !important; }
+          .ch-banner > .ch-banner-stat:first-child { grid-column: 1 / -1; }
+          .ch-banner-big { font-size: 22px !important; }
+          .ch-banner-channels { grid-column: 1 / -1; display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 10px 14px !important; border-top: 1px solid rgba(255,255,255,0.15) !important; padding-top: 12px !important; }
         }
         .ch-mobile-nav { display: none; }
         /* 데스크탑: 인라인 패널 숨김 */
@@ -1006,38 +1013,38 @@ export default function ChannelsPage() {
                 .filter(ch => ch.count > 0)
                 .sort((a, b) => b.count - a.count)
               return (
-                <div style={{
+                <div className="ch-banner" style={{
                   background: 'linear-gradient(135deg, #7b2d00 0%, #f97316 100%)',
                   borderRadius: 14, padding: '20px 28px',
                   boxShadow: '0 4px 16px rgba(249,115,22,0.3)', marginBottom: 16,
                   display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap',
                 }}>
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>📋 견적요청 총괄</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
                     {compareDates && (
                       <div style={{ fontSize: 11, color: '#d7bde2', marginTop: 2 }}>vs {compareDates.startDate} ~ {compareDates.endDate}</div>
                     )}
                   </div>
-                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 견적요청</div>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalQuotes.toLocaleString()}건</div>
+                    <div className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalQuotes.toLocaleString()}건</div>
                     {cmp && <DeltaBadge cur={totalQuotes} prev={cmp.total} suffix="건" light />}
                   </div>
-                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 방문 {(humanV + botV).toLocaleString()}회</div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                      <span style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>👤 {humanV.toLocaleString()}</span>
+                      <span className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>👤 {humanV.toLocaleString()}</span>
                       <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>🤖 봇 {botV.toLocaleString()} 제외</span>
                     </div>
                     {cmp && <DeltaBadge cur={humanV} prev={cmp.totalSessions ?? 0} suffix="명" light />}
                   </div>
                   {channelQuotes.length > 0 && (
                     <>
-                      <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                      <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                      <div className="ch-banner-channels" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                         {channelQuotes.map(ch => (
                           <div key={ch.channel}>
                             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
@@ -1058,23 +1065,23 @@ export default function ChannelsPage() {
               const totalAdCost = Object.values(adCosts).reduce((s, v) => s + v, 0)
               const channelEntries = Object.entries(adCosts).sort((a, b) => b[1] - a[1])
               return (
-                <div style={{
+                <div className="ch-banner" style={{
                   background: 'linear-gradient(135deg, #1a3a6b 0%, #2980b9 100%)',
                   borderRadius: 14, padding: '20px 28px',
                   boxShadow: '0 4px 16px rgba(41,128,185,0.3)', marginBottom: 16,
                   display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap',
                 }}>
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>💸 광고비 총괄</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
                   </div>
-                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 광고비</div>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalAdCost.toLocaleString()}원</div>
+                    <div className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalAdCost.toLocaleString()}원</div>
                   </div>
-                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                  <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div className="ch-banner-channels" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                     {channelEntries.map(([ch, amount]) => (
                       <div key={ch}>
                         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
@@ -1095,30 +1102,30 @@ export default function ChannelsPage() {
               const totalQuotes = data.summary.total
               const contractRate = totalQuotes > 0 ? ((totalContracts / totalQuotes) * 100).toFixed(1) : '0.0'
               return (
-                <div style={{
+                <div className="ch-banner" style={{
                   background: 'linear-gradient(135deg, #1a6b3a 0%, #27ae60 100%)',
                   borderRadius: 14, padding: '20px 28px',
                   boxShadow: '0 4px 16px rgba(39,174,96,0.3)', marginBottom: 16,
                   display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap',
                 }}>
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>🏆 계약 총괄</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
                   </div>
-                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>전체 계약수</div>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalContracts}건</div>
+                    <div className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalContracts}건</div>
                   </div>
-                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
-                  <div style={{ marginRight: 40 }}>
+                  <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 공급가액</div>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalAmount.toLocaleString()}원</div>
+                    <div className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalAmount.toLocaleString()}원</div>
                   </div>
-                  <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                  <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
                   <div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>전체 계약전환율</div>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{contractRate}%</div>
+                    <div className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{contractRate}%</div>
                   </div>
                 </div>
               )
@@ -1261,7 +1268,7 @@ export default function ChannelsPage() {
                             background: '#f0fff4', borderRadius: 8,
                             borderLeft: `3px solid #27ae60`,
                           }}>
-                            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                            <div className="ch-banner-channels" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                               <div>
                                 <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>계약 성사</div>
                                 <div style={{ fontSize: 14, fontWeight: 700, color: '#27ae60' }}>
