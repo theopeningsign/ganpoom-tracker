@@ -598,6 +598,7 @@ export default function ChannelsPage() {
   const [compareInput, setCompareInput] = useState(getDefaultDates)  // 비교 기간 입력값
   const [compareDates, setCompareDates] = useState(null)             // 실제 비교 조회 기간
   const [compareData, setCompareData] = useState(null)               // 비교 기간 통계
+  const [compareAdCosts, setCompareAdCosts] = useState(null)         // 비교 기간 광고비
   const [compareLoading, setCompareLoading] = useState(false)
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -609,7 +610,7 @@ export default function ChannelsPage() {
 
   // 비교 기간 통계 조회 (2026-08-03): 봇 제외 기준은 본 조회와 동일
   useEffect(() => {
-    if (!compareDates) { setCompareData(null); return }
+    if (!compareDates) { setCompareData(null); setCompareAdCosts(null); return }
     let cancelled = false
     ;(async () => {
       setCompareLoading(true)
@@ -618,6 +619,22 @@ export default function ChannelsPage() {
         const res = await fetch(`/api/events/stats?${params}`)
         const json = await res.json()
         if (!cancelled && json.success) setCompareData(json)
+        // 비교 기간 광고비 (2026-08-03): 본 조회와 동일 매핑 (텐핑 VAT 1.1)
+        const adParams = new URLSearchParams({ startDate: compareDates.startDate, endDate: compareDates.endDate })
+        const adRes = await fetch(`/api/adcosts?${adParams}`)
+        const adJson = await adRes.json()
+        if (!cancelled) {
+          if (adJson.success && adJson.totals) {
+            const mapped = {}
+            Object.entries(adJson.totals).forEach(([adKey, amount]) => {
+              const evCh = ADCOST_TO_CH[adKey]
+              if (evCh && amount > 0) mapped[evCh] = adKey === 'tenping' ? Math.round(amount * 1.1) : amount
+            })
+            setCompareAdCosts(mapped)
+          } else {
+            setCompareAdCosts({})
+          }
+        }
       } catch (e) { console.error(e) }
       finally { if (!cancelled) setCompareLoading(false) }
     })()
@@ -1037,7 +1054,7 @@ export default function ChannelsPage() {
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 방문 {(humanV + botV).toLocaleString()}회</div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
                       <span className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>👤 {humanV.toLocaleString()}</span>
-                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>🤖 봇 {botV.toLocaleString()} 제외</span>
+                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>🤖 봇 {botV.toLocaleString()}</span>
                     </div>
                     {cmp && <DeltaBadge cur={humanV} prev={cmp.totalSessions ?? 0} suffix="명" light />}
                   </div>
@@ -1064,6 +1081,8 @@ export default function ChannelsPage() {
             {adCosts && Object.keys(adCosts).length > 0 && (() => {
               const totalAdCost = Object.values(adCosts).reduce((s, v) => s + v, 0)
               const channelEntries = Object.entries(adCosts).sort((a, b) => b[1] - a[1])
+              const cmpAd = compareAdCosts
+              const cmpAdTotal = cmpAd ? Object.values(cmpAd).reduce((s, v) => s + v, 0) : null
               return (
                 <div className="ch-banner" style={{
                   background: 'linear-gradient(135deg, #1a3a6b 0%, #2980b9 100%)',
@@ -1074,11 +1093,15 @@ export default function ChannelsPage() {
                   <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>💸 광고비 총괄</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{dates.startDate} ~ {dates.endDate}</div>
+                    {compareDates && (
+                      <div style={{ fontSize: 11, color: '#aed6f1', marginTop: 2 }}>vs {compareDates.startDate} ~ {compareDates.endDate}</div>
+                    )}
                   </div>
                   <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
                   <div className="ch-banner-stat" style={{ marginRight: 40 }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 광고비</div>
                     <div className="ch-banner-big" style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalAdCost.toLocaleString()}원</div>
+                    {cmpAd && <DeltaBadge cur={totalAdCost} prev={cmpAdTotal} suffix="원" light />}
                   </div>
                   <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
                   <div className="ch-banner-channels" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -1088,6 +1111,7 @@ export default function ChannelsPage() {
                           {CHANNEL_LABELS[ch] || ch}
                         </div>
                         <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{amount.toLocaleString()}원</div>
+                        {cmpAd && <DeltaBadge cur={amount} prev={cmpAd[ch] || 0} suffix="원" light />}
                       </div>
                     ))}
                   </div>
@@ -1178,7 +1202,7 @@ export default function ChannelsPage() {
                             {ch.sessions > 0 && (
                               <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: 18, fontWeight: 700, color: '#555' }}>{ch.sessions.toLocaleString()}</div>
-                                <div style={{ fontSize: 11, color: '#aaa' }}>방문 (사람)</div>
+                                <div style={{ fontSize: 11, color: '#aaa' }}>방문</div>
                                 {cmpCh && <DeltaBadge cur={ch.sessions} prev={cmpCh.sessions} />}
                               </div>
                             )}
