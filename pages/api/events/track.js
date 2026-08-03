@@ -90,6 +90,24 @@ function parseDomain(url) {
   }
 }
 
+// ── 봇 감지 (2026-08-03) ─────────────────────────────────────
+// 차단이 아니라 is_bot 플래그만 저장 → 대시보드에서 사람/봇 분리 집계.
+// 1) 자기신고형 봇 UA (Googlebot, bingbot, Yeti 등 "bot|crawler|spider"류)
+// 2) 알려진 크롤러 IP 대역 (구글 66.249.x, 빙 157.55/207.46/40.77)
+// 3) 클라이언트 신호 (gp.js가 navigator.webdriver 감지 시 is_bot:true 전송)
+const BOT_UA_RE = /bot|crawler|spider|crawling|slurp|headless|phantomjs|puppeteer|playwright|selenium|lighthouse|pagespeed|pingdom|facebookexternalhit|whatsapp|telegram|bytespider|petalbot|ahrefs|semrush|mj12|yeti|kakaotalk-scrap/i
+
+function detectBot(req, body, ip) {
+  if (body && body.is_bot === true) return true
+  const ua = req.headers['user-agent'] || ''
+  if (ua && BOT_UA_RE.test(ua)) return true
+  if (ip && (
+    ip.startsWith('66.249.') ||                                        // Googlebot 공식 대역
+    ip.startsWith('157.55.') || ip.startsWith('207.46.') || ip.startsWith('40.77.') // Bingbot 대역
+  )) return true
+  return false
+}
+
 export default async function handler(req, res) {
   // CORS - ganpoom.com 및 스테이징 허용
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -129,6 +147,7 @@ export default async function handler(req, res) {
     // IP 추출 (프록시/로드밸런서 고려)
     const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()
     const ipLocation = await getIpLocation(ip)
+    const isBot = detectBot(req, body, ip) // 봇 플래그 (2026-08-03)
 
     const channel = body.channel || body.utm_source || null
     const channelType = resolveChannelType(channel)
@@ -172,6 +191,7 @@ export default async function handler(req, res) {
       client_ip_subdivision: body.client_ip_subdivision || ipLocation.client_ip_subdivision || null,
 
       session_id: body.session_id || null,
+      is_bot: isBot, // 봇 여부 (집계에서 분리용, 2026-08-03)
 
       // 스테이징 여부: landing_page 또는 referrer에 staging 포함되면 true
       is_staging: !!(
@@ -180,7 +200,13 @@ export default async function handler(req, res) {
       ),
     }
 
-    const { error } = await supabase.from('events').insert(event)
+    let { error } = await supabase.from('events').insert(event)
+
+    // is_bot 컬럼 마이그레이션 전 안전장치: 컬럼 없어서 실패하면 플래그 빼고 재시도
+    if (error && /is_bot/i.test(error.message || '')) {
+      delete event.is_bot
+      ;({ error } = await supabase.from('events').insert(event))
+    }
 
     if (error) {
       console.error('events insert error:', error)

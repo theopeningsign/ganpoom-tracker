@@ -48,6 +48,12 @@ export default async function handler(req, res) {
     page++
   }
 
+  // 봇 분리 (2026-08-03): is_bot=true 행은 모든 집계에서 제외, 카운트만 별도 제공
+  // (is_bot 컬럼 마이그레이션 전 데이터는 undefined → 자동으로 사람 취급, 오류 없음)
+  const botRows = allEvents.filter(e => e.is_bot === true)
+  const botSessions = botRows.filter(e => e.event_category === 'session.start').length
+  allEvents = allEvents.filter(e => e.is_bot !== true)
+
   // 견적요청 이벤트만 필터
   const events = allEvents.filter(e => QUOTE_EVENTS.includes(e.event_category))
 
@@ -150,6 +156,8 @@ export default async function handler(req, res) {
       blog: typeMap.blog,
       cpa: typeMap.cpa,
       signup: signupCount,
+      botSessions,            // 봇 방문 수 (집계 제외분, 2026-08-03)
+      botEvents: botRows.length, // 봇 이벤트 총수
     },
     channelStats,
     categoryStats,

@@ -33,6 +33,7 @@
       })(),
       attrKey: 'gp_attr',
       sessionKey: 'gp_session',
+      firstRefKey: 'gp_first_ref',   // 세션 최초 외부 유입 referrer (내부이동 오염 방지, 2026-08-03)
       attrExpiry: 30,
       sessionExpiry: 1,
       debug: false,
@@ -113,6 +114,22 @@
       try { return new URL(url).hostname.replace('www.', ''); } catch (_) { return null; }
     }
 
+    // 자사 도메인 여부 — 내부 페이지 이동은 '유입경로'가 아님 (2026-08-03)
+    function isInternalRef(url) {
+      const d = parseDomain(url);
+      return !!d && (d === 'ganpoom.com' || d.endsWith('.ganpoom.com'));
+    }
+
+    // 유입 referrer 결정: 세션 최초 저장분 우선, 없으면 현재 referrer가 외부일 때만 사용
+    // (기존엔 이벤트 시점의 document.referrer를 그대로 써서, 사이트 내부 이동 후
+    //  견적요청하면 유입경로에 ganpoom.com이 찍히던 문제 수정)
+    function getExternalRef() {
+      const saved = Cookie.get(CONFIG.firstRefKey);
+      if (saved) return saved;
+      const dr = document.referrer || null;
+      return dr && !isInternalRef(dr) ? dr : null;
+    }
+
     function getSessionId() {
       let id = Cookie.get(CONFIG.sessionKey);
       if (!id) {
@@ -160,12 +177,13 @@
           k_media: attr.k_media || null,
           gclid: attr.gclid || null,
           agent_id: attr.ref || null,
-          referrer: attr.referrer || document.referrer || null,
-          referrer_domain: parseDomain(attr.referrer || document.referrer),
+          referrer: attr.referrer || getExternalRef(),
+          referrer_domain: parseDomain(attr.referrer || getExternalRef()),
           landing_page: attr.landing_page || window.location.href,
           session_id: getSessionId(),
           ...extra,
         };
+        if (navigator.webdriver === true) payload.is_bot = true; // 자동화 브라우저(봇) 신호 (2026-08-03)
         log('send', eventCategory, payload);
         fetch(CONFIG.apiEndpoint + '/events/log', {
           method: 'POST',
@@ -223,6 +241,11 @@
 
     function init() {
       const isNewSession = !Cookie.get(CONFIG.sessionKey); // 세션 생성 전에 체크
+      if (isNewSession) {
+        // 세션 최초 진입 시점의 '외부' referrer만 고정 저장 → 이후 모든 이벤트가 이 값 사용 (2026-08-03)
+        const dr = document.referrer || null;
+        if (dr && !isInternalRef(dr)) Cookie.set(CONFIG.firstRefKey, dr, CONFIG.sessionExpiry);
+      }
       initAttribution();
       ready = true;
       flush();

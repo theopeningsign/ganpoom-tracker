@@ -604,7 +604,7 @@ export default function ChannelsPage() {
     setDetailLoading(true)
     setDetail(null)
     try {
-      const params = new URLSearchParams({ channel, startDate: dates.startDate, endDate: dates.endDate, platform })
+      const params = new URLSearchParams({ channel, startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/channel-detail?${params}`)
       const json = await res.json()
       if (json.success) setDetail(json)
@@ -613,7 +613,7 @@ export default function ChannelsPage() {
     } finally {
       setDetailLoading(false)
     }
-  }, [dates, platform])
+  }, [dates, platform, showStaging])
 
   // API 데이터 + 미리 정의된 채널 병합 (데이터 없어도 항상 노출)
   const displayChannels = useMemo(() => {
@@ -963,6 +963,15 @@ export default function ChannelsPage() {
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>총 견적요청</div>
                     <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{totalQuotes.toLocaleString()}건</div>
                   </div>
+                  {(data.summary.botSessions ?? 0) > 0 && (
+                    <>
+                      <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
+                      <div style={{ marginRight: 40 }}>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>🤖 봇 방문 (집계 제외)</div>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: 'white' }}>{(data.summary.botSessions ?? 0).toLocaleString()}회</div>
+                      </div>
+                    </>
+                  )}
                   {channelQuotes.length > 0 && (
                     <>
                       <div style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />

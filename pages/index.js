@@ -257,13 +257,13 @@ export default function Dashboard() {
     setChModal({ channel, label })
     setChDetailLoading(true)
     try {
-      const params = new URLSearchParams({ channel, startDate: dates.startDate, endDate: dates.endDate, platform })
+      const params = new URLSearchParams({ channel, startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/channel-detail?${params}`)
       const json = await res.json()
       if (json.success) setChDetail(json)
     } catch (e) { console.error(e) }
     finally { setChDetailLoading(false) }
-  }, [dates, platform])
+  }, [dates, platform, showStaging])
 
   const openCategoryModal = useCallback(async (category, label) => {
     setModalLoading(true)
@@ -763,13 +763,14 @@ export default function Dashboard() {
           ) : (
             <>
               {/* 요약 카드 */}
-              <div className="gp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16, marginBottom: 28 }}>
+              <div className="gp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 16, marginBottom: 28 }}>
                 <StatCard label="전체 견적요청" value={data.summary.total} color="#4facfe" />
                 <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" />
                 <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" />
                 <StatCard label="블로그 / SNS" value={data.summary.blog} sub="Blog" color="#00C73C" />
                 <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" />
                 <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" onClick={() => openCategoryModal('airbridge.user.signup', '회원가입')} />
+                <StatCard label="봇 방문 (집계 제외)" value={data.summary.botSessions ?? 0} sub="Bot" color="#7f8c8d" />
               </div>
 
               {/* 채널 테이블 + 일별 추이 */}

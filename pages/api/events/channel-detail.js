@@ -9,7 +9,7 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { channel, startDate, endDate, platform } = req.query
+  const { channel, startDate, endDate, platform, staging } = req.query
   if (!channel) return res.status(400).json({ error: 'channel is required' })
 
   try {
@@ -26,12 +26,15 @@ export default async function handler(req, res) {
         q = q.eq('channel', channel)
       }
       if (platform && platform !== 'all') q = q.eq('platform', platform)
+      // 스테이징 필터 (2026-08-03): 기존에 누락되어 본서버 세부사항 조회에 스테이징 데이터가 섞이던 버그 수정
+      if (staging === 'true') q = q.eq('is_staging', true)
+      else q = q.or('is_staging.is.null,is_staging.eq.false')
       return q
     }
 
     // 최근 이벤트 목록 (최대 50건)
     const { data: recentEvents, error: recentError } = await applyFilters(
-      supabase.from('events').select('id, event_category, campaign, ad_group, platform, device_type, client_ip_city, created_at, agent_id, referrer, referrer_domain')
+      supabase.from('events').select('*')
         .in('event_category', QUOTE_EVENTS)
     ).order('created_at', { ascending: false }).limit(50)
 
@@ -43,13 +46,17 @@ export default async function handler(req, res) {
     let pg = 0
     while (true) {
       const { data: pageData, error: pageError } = await applyFilters(
-        supabase.from('events').select('campaign, ad_group, event_category, device_type, platform, created_at, k_keyword, utm_term, agent_id, referrer, referrer_domain, req_id')
+        supabase.from('events').select('*')
       ).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
       if (pageError) { console.error('allEvents error:', pageError); break }
       allEvents = allEvents.concat(pageData || [])
       if (!pageData || pageData.length < PAGE_SIZE) break
       pg++
     }
+
+    // 봇 제외 (2026-08-03): is_bot=true 행은 세부 집계에서 제외
+    allEvents = allEvents.filter(e => e.is_bot !== true)
+    const recentHuman = (recentEvents || []).filter(e => e.is_bot !== true)
 
     const campaigns = {}
     const categories = {}
@@ -114,9 +121,13 @@ export default async function handler(req, res) {
     // referrer 전체 URL 집계 (모든 채널)
     let referrerDomains = []
     const domainMap = {}
+    const isInternalUrl = (url) => {
+      try { const h = new URL(url).hostname.replace('www.', ''); return h === 'ganpoom.com' || h.endsWith('.ganpoom.com') } catch { return false }
+    }
     ;(allEvents || []).forEach(ev => {
       const url = ev.referrer || null
-      const key = url || '(직접유입)'
+      // 자사 도메인 referrer = 사이트 내부 이동 → 유입경로가 아니므로 별도 그룹 (2026-08-03)
+      const key = !url ? '(직접유입)' : (isInternalUrl(url) ? '(내부이동·유입경로 아님)' : url)
       if (!domainMap[key]) domainMap[key] = { url: key, isDirect: !url, visits: 0, quotes: 0 }
       if (ev.event_category === 'session.start') domainMap[key].visits++
       if (QUOTE_EVENTS.includes(ev.event_category)) domainMap[key].quotes++
@@ -169,7 +180,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       total: (allEvents || []).length,
-      recentEvents: recentEvents || [],
+      recentEvents: recentHuman,
       campaigns: campaignList,
       keywords: keywordList,
       agentStats,

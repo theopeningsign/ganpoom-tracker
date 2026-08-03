@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   try {
     let query = supabase
       .from('events')
-      .select('channel, channel_type, created_at')
+      .select('*')
       .eq('event_category', category)
 
     if (startDate) query = query.gte('created_at', `${startDate}T00:00:00+09:00`)
@@ -33,7 +33,8 @@ export default async function handler(req, res) {
       if (!pageData || pageData.length < PAGE_SIZE) break
       pg++
     }
-    const data = allData
+    // 봇 제외 (2026-08-03)
+    const data = allData.filter(e => e.is_bot !== true)
 
     // 채널별 집계
     const channelMap = {}

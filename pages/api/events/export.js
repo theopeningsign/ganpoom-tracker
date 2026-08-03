@@ -8,7 +8,7 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { startDate, endDate, platform, staging } = req.query
+  const { startDate, endDate, platform, staging, bots } = req.query
 
   const start = startDate ? new Date(startDate + 'T00:00:00+09:00') : (() => {
     const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d
@@ -44,6 +44,9 @@ export default async function handler(req, res) {
     if (!data || data.length < PAGE_SIZE) break
     page++
   }
+
+  // 봇 제외 (2026-08-03): bots=include 파라미터일 때만 포함
+  if (bots !== 'include') allEvents = allEvents.filter(e => e.is_bot !== true)
 
   // 채널 값 정규화 (DB에 이미 저장된 구버전 값도 통일)
   const CHANNEL_NORMALIZE = { 'ig': 'instagram_official', 'instagram': 'instagram_official' }
