@@ -79,7 +79,7 @@ export default function DateRangePicker({ value, onApply, accent = '#4facfe', pl
       </button>
 
       {open && (
-        <div style={{
+        <div className="gp-drp-pop" style={{
           position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 1100,
           background: 'white', borderRadius: 12, padding: 14, width: 268,
           boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '1px solid #eee',
@@ -142,6 +142,20 @@ export default function DateRangePicker({ value, onApply, accent = '#4facfe', pl
           </div>
         </div>
       )}
+      {/* 모바일: 버튼 기준 absolute는 화면 밖으로 잘리므로 화면 중앙 고정 (2026-08-03) */}
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .gp-drp-pop {
+            position: fixed !important;
+            left: 50% !important;
+            top: 50% !important;
+            right: auto !important;
+            transform: translate(-50%, -50%);
+            width: min(320px, calc(100vw - 32px)) !important;
+            box-shadow: 0 12px 48px rgba(0,0,0,0.35) !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }
