@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     while (true) {
       const { data: pageData, error: pageError } = await applyFilters(
         supabase.from('events').select('*')
-      ).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
+      ).order('id', { ascending: false }).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
       if (pageError) { console.error('allEvents error:', pageError); break }
       allEvents = allEvents.concat(pageData || [])
       if (!pageData || pageData.length < PAGE_SIZE) break

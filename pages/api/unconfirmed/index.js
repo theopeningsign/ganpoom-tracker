@@ -43,6 +43,7 @@ export default async function handler(req, res) {
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .eq('is_staging', false)
+        .order('id', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
       if (error) { console.error('supabase error:', error); break }
       allEvents = allEvents.concat(data || [])

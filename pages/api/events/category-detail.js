@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     let allData = []
     let pg = 0
     while (true) {
-      const { data: pageData, error } = await query.range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
+      const { data: pageData, error } = await query.order('id', { ascending: false }).range(pg * PAGE_SIZE, (pg + 1) * PAGE_SIZE - 1)
       if (error) throw error
       allData = allData.concat(pageData || [])
       if (!pageData || pageData.length < PAGE_SIZE) break

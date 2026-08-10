@@ -172,6 +172,21 @@ ganpoom-tracker-main/
 
 ## 📝 개발 이력
 
+### 2026-08-08 — 페이지네이션 정렬 누락으로 인한 집계 중복/누락 수정 ⭐
+- **증상:** 대시보드 견적요청이 8/3~8/9 기간에 **86건**으로 표시 (Supabase 직접 SQL·엑셀 내보내기 정답은 **76건**). 날짜별 오차가 +4/0/+10/+6/**−13**/+3/0으로 부풀림·누락이 섞여 흩어짐 → 시간대 문제 아님. 새로고침할 때마다 숫자가 달라짐.
+- **원인:** 여러 API가 `.range()`로 1,000행씩 페이지네이션하면서 **`.order()`가 없었음.** ORDER BY 없는 OFFSET 페이지네이션은 페이지마다 행 순서가 보장되지 않아 같은 행이 중복 조회되거나 누락됨.
+- **수정:** `.range()` 호출 앞에 `.order('id', { ascending: false })` 추가 (5개 파일 각 1줄).
+  - `pages/api/events/stats.js` (86 vs 76 사건의 직접 원인)
+  - `pages/api/events/category-detail.js`
+  - `pages/api/events/channel-detail.js`
+  - `pages/api/contracts/data.js`
+  - `pages/api/unconfirmed/index.js`
+  - ※ `export.js`는 원래 `.order('created_at')`가 있어서 정확했음 (그래서 엑셀만 정답과 일치).
+  - `id` 사용 이유: 고유값이라 순서가 완전히 고정됨 (created_at은 이론상 동률 가능).
+- **검증:** `.range()` 쓰는 6곳 전수 점검 → 전부 order 확인. 빌드 통과. 배포 후 대시보드(8/3~8/9) 여러 번 새로고침해 **76 고정**이면 성공.
+- 사이드이펙트: 없음 (조회 순서만 고정, 집계 로직·DB 무변경). 롤백: 커밋 되돌리기.
+- 출처: Cowork 세션 원인 규명 → `인수인계_페이지네이션_수정 (2026-08-08).md`
+
 ### 2026-05 — 인스타그램 채널 키 정규화
 - `gp.js`: `resolveChannel`에 `CHANNEL_NORMALIZE` 맵 추가 — `ig`, `instagram` → `instagram_official`
 - `export.js`: 엑셀 내보내기 시 기존 DB에 쌓인 `ig` 값도 `instagram_official`로 변환 (DB 직접 수정 없이)

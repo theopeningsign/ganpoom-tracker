@@ -27,6 +27,7 @@ export default async function handler(req, res) {
       .select('*')
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString())
+      .order('id', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
     if (platform && platform !== 'all') q = q.eq('platform', platform)
