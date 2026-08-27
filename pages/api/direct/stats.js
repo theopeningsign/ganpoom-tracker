@@ -5,9 +5,12 @@
  * 이름·상호·지역 같은 세부 정보는 트래커로 넘기지 않는다.
  *
  * 응답:
- *   { success, total, daily:[{date,count}], firstScrapedAt, lastScrapedAt, fromCache, note }
+ *   { success, total, daily:[{date,count}], firstScrapedAt, lastScrapedAt, lastCheckedAt, fromCache, note }
+ *
+ * lastScrapedAt = 마지막으로 새 건이 들어온 시각 (신규 없으면 안 움직임)
+ * lastCheckedAt = 마지막으로 확인한 시각 (스크래핑이 돌 때마다 갱신) ← 화면에 쓰는 값
  */
-import { getDirectStats, isConfigured } from '../../../lib/gpdirect'
+import { getDirectStats, getLastCheckedAt, isConfigured } from '../../../lib/gpdirect'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -33,11 +36,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const stats = await getDirectStats(startDate, endDate, { fresh: fresh === '1' || fresh === 'true' })
+    const isFresh = fresh === '1' || fresh === 'true'
+    // 둘은 서로 독립이라 같이 쏜다. lastCheckedAt 이 실패해도 통계는 살아야 하므로
+    // getLastCheckedAt 내부에서 예외를 삼키고 null 을 돌려준다.
+    const [stats, lastCheckedAt] = await Promise.all([
+      getDirectStats(startDate, endDate, { fresh: isFresh }),
+      getLastCheckedAt({ fresh: isFresh }),
+    ])
     return res.status(200).json({
       success: true,
       configured: true,
       ...stats,
+      lastCheckedAt,
       note: '게시판 노출 기준 하한선 · 스크랩시각 기준이라 일 단위는 ±1일 오차',
     })
   } catch (e) {

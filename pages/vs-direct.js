@@ -410,7 +410,7 @@ export default function VsDirectPage() {
                   {' '}— 현재 신뢰 시작 설정: <code>{DIRECT_COMPARE_FROM}</code>
                 </div>
                 <div style={{ marginTop: 4, color: '#bbb' }}>설정을 바꾸려면 <code>lib/constants.js</code> 의 해당 상수 한 줄만 고치면 됩니다.</div>
-                {theirs?.lastScrapedAt && <div style={{ marginTop: 6 }}>다이렉트 데이터 최종 반영: {theirs.lastScrapedAt}</div>}
+                {theirs?.lastScrapedAt && <div style={{ marginTop: 6 }}>다이렉트 마지막 신규 접수: {theirs.lastScrapedAt}</div>}
               </div>
             </div>
 

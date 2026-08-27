@@ -222,16 +222,26 @@ function DirectStatCard({ data, loading, delta, onRefresh, refreshing, refreshMs
   const configured = data?.configured !== false
   const value = Number.isFinite(data?.total) ? data.total : 0
 
-  // '언제까지 반영된 숫자인가'를 카드 안에서 바로 알 수 있게 한다.
-  // 4시간 간격 + 스케줄 지연 때문에 이게 없으면 오늘 숫자를 오해하기 쉽다.
+  // '몇 시 기준 숫자인가' = 스크래핑이 마지막으로 돌아 확인한 시각.
+  //
+  // 주의: lastScrapedAt(마지막으로 새 건이 들어온 시각)을 쓰면 안 된다.
+  // 신규 접수가 없으면 그 값이 안 움직여서, ↻ 를 눌러도 시각이 그대로라
+  // "지금 확인한 게 맞나?" 를 알 수 없다. lastCheckedAt 은 돌 때마다 갱신된다.
+  const checkedMs = (() => {
+    const ms = new Date(data?.lastCheckedAt ?? NaN).getTime()   // ISO(UTC)
+    return Number.isFinite(ms) ? ms : null
+  })()
+
+  // KST 로 'MM-DD HH:mm'
+  const checkedLabel = checkedMs
+    ? new Date(checkedMs + 9 * 3600 * 1000).toISOString().slice(5, 16).replace('T', ' ')
+    : null
+
+  // 4시간 간격 + 스케줄 지연(최대 3h)이라 5시간 넘게 확인이 없으면 이상 신호다.
   const stale = (() => {
-    try {
-      if (typeof data?.lastScrapedAt !== 'string') return null
-      const ms = new Date(data.lastScrapedAt.replace(' ', 'T') + '+09:00').getTime()
-      if (!Number.isFinite(ms)) return null
-      const diffH = (Date.now() - ms) / 3600000
-      return diffH >= 5 ? Math.floor(diffH) : null
-    } catch { return null }
+    if (!checkedMs) return null
+    const diffH = (Date.now() - checkedMs) / 3600000
+    return diffH >= 5 ? Math.floor(diffH) : null
   })()
 
   return (
@@ -262,8 +272,8 @@ function DirectStatCard({ data, loading, delta, onRefresh, refreshing, refreshMs
       <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
         {!configured ? '토큰 미설정'
           : refreshMsg ? <span style={{ color: '#7f8c8d' }}>{refreshMsg}</span>
-          : stale ? <span style={{ color: '#e67e22' }}>⚠ {stale}시간 전 기준</span>
-          : data?.lastScrapedAt ? `${data.lastScrapedAt.slice(5, 16)} 기준`
+          : stale ? <span style={{ color: '#e67e22' }} title={checkedLabel ? `마지막 확인 ${checkedLabel}` : undefined}>⚠ {stale}시간째 확인 안 됨</span>
+          : checkedLabel ? <span title={data?.lastScrapedAt ? `마지막 신규 접수: ${data.lastScrapedAt}` : undefined}>{checkedLabel} 확인</span>
           : '간판다이렉트'}
       </div>
 
