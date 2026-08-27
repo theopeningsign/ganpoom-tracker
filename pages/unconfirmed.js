@@ -37,6 +37,7 @@ const CONTRACT_STATUS = {
 const NAV = [
   { href: '/', label: '대시보드', icon: '📊' },
   { href: '/channels', label: '채널 분석', icon: '📡' },
+  { href: '/vs-direct', label: '간품 vs 다이렉트', icon: '⚔️' },
   { href: '/unconfirmed', label: '미확인 계약', icon: '⚠️' },
   { href: '/adcosts', label: '광고비 입력', icon: '💸' },
   { href: '/admin/agents', label: 'CPA 에이전트', icon: '👥' },

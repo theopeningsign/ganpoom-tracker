@@ -182,6 +182,18 @@ function DeltaBadge({ cur, prev, suffix = '' }) {
   )
 }
 
+function mergeDaily(ourDaily, directDaily) {
+  const ours = Array.isArray(ourDaily) ? ourDaily : []
+  const theirs = Array.isArray(directDaily) ? directDaily : []
+  const directMap = new Map(theirs.map(d => [d.date, d.count]))
+  const dates = [...new Set([...ours.map(d => d.date), ...directMap.keys()])].sort()
+  return dates.map(date => ({
+    date,
+    total: ours.find(d => d.date === date)?.total ?? 0,
+    direct: directMap.get(date) ?? 0,
+  }))
+}
+
 function StatCard({ label, value, sub, color, onClick, delta }) {
   return (
     <div
@@ -204,9 +216,70 @@ function StatCard({ label, value, sub, color, onClick, delta }) {
   )
 }
 
+// 간판다이렉트(경쟁사) 접수 카드 (2026-08-27)
+// 값은 카운트뿐이다. 이름·상호·지역 같은 세부정보는 트래커로 가져오지 않는다.
+function DirectStatCard({ data, loading, delta, onRefresh, refreshing, refreshMsg }) {
+  const configured = data?.configured !== false
+  const value = Number.isFinite(data?.total) ? data.total : 0
+
+  // '언제까지 반영된 숫자인가'를 카드 안에서 바로 알 수 있게 한다.
+  // 4시간 간격 + 스케줄 지연 때문에 이게 없으면 오늘 숫자를 오해하기 쉽다.
+  const stale = (() => {
+    try {
+      if (typeof data?.lastScrapedAt !== 'string') return null
+      const ms = new Date(data.lastScrapedAt.replace(' ', 'T') + '+09:00').getTime()
+      if (!Number.isFinite(ms)) return null
+      const diffH = (Date.now() - ms) / 3600000
+      return diffH >= 5 ? Math.floor(diffH) : null
+    } catch { return null }
+  })()
+
+  return (
+    <div style={{
+      background: 'white', borderRadius: 12, padding: '20px 24px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderLeft: '4px solid #7f8c8d',
+      position: 'relative',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 13, color: '#888' }}>다이렉트 접수</span>
+        <button
+          onClick={onRefresh}
+          disabled={refreshing || !configured}
+          title={refreshing ? '스크래핑 실행 중' : '지금 스크래핑을 돌려 최신 건수로 갱신 (하루 12회)'}
+          style={{
+            border: '1px solid #ddd', background: refreshing ? '#f0f0f0' : 'white',
+            borderRadius: 6, width: 24, height: 24, lineHeight: '20px', padding: 0,
+            fontSize: 12, color: refreshing ? '#bbb' : '#7f8c8d',
+            cursor: refreshing || !configured ? 'default' : 'pointer',
+          }}
+        >{refreshing ? '⏳' : '↻'}</button>
+      </div>
+
+      <div style={{ fontSize: 32, fontWeight: 700, color: configured ? '#1a1a1a' : '#ccc' }}>
+        {loading ? '…' : configured ? value.toLocaleString() : '\u2014'}
+      </div>
+
+      <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+        {!configured ? '토큰 미설정'
+          : refreshMsg ? <span style={{ color: '#7f8c8d' }}>{refreshMsg}</span>
+          : stale ? <span style={{ color: '#e67e22' }}>⚠ {stale}시간 전 기준</span>
+          : data?.lastScrapedAt ? `${data.lastScrapedAt.slice(5, 16)} 기준`
+          : '간판다이렉트'}
+      </div>
+
+      {delta && <div style={{ marginTop: 4 }}>{delta}</div>}
+      <div style={{ fontSize: 11, color: '#c0c0c0', marginTop: 6 }}
+           title="간판다이렉트 공개 게시판에 노출된 건만 집계합니다. 접수일자가 제공되지 않아 '스크랩시각' 기준이라 일 단위로는 ±1일 오차가 있고, 게시판 노출 한도(약 20건) 때문에 실제 접수량의 하한선입니다.">
+        게시판 노출 기준 ⓘ
+      </div>
+    </div>
+  )
+}
+
 const NAV = [
   { href: '/', label: '대시보드', icon: '📊' },
   { href: '/channels', label: '채널 분석', icon: '📡' },
+  { href: '/vs-direct', label: '간품 vs 다이렉트', icon: '⚔️' },
   { href: '/unconfirmed', label: '미확인 계약', icon: '⚠️' },
   { href: '/adcosts', label: '광고비 입력', icon: '💸' },
   { href: '/admin/agents', label: 'CPA 에이전트', icon: '👥' },
@@ -270,7 +343,14 @@ export default function Dashboard() {
   const [chDetail, setChDetail] = useState(null)
   const [chDetailLoading, setChDetailLoading] = useState(false)
   const [chDetailTab, setChDetailTab] = useState('events')
+  // 간판다이렉트(경쟁사) 접수 건수 (2026-08-27)
+  const [directData, setDirectData] = useState(null)
+  const [directLoading, setDirectLoading] = useState(true)
+  const [directCompare, setDirectCompare] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState('')
   const fetchSeq = useRef(0)
+  const directSeq = useRef(0)
 
   const openChannelModal = useCallback(async (channel, label) => {
     setChDetail(null)
@@ -328,6 +408,93 @@ export default function Dashboard() {
   }, [dates, platform, showStaging])
 
   useEffect(() => { fetchStats() }, [fetchStats])
+
+  // 간판다이렉트 접수 건수 조회 (2026-08-27)
+  // 대시보드 기간과 완전히 같은 startDate/endDate 를 쓴다. platform/staging 은
+  // 남의 사이트 데이터라 적용 대상이 아니므로 의존성에 넣지 않는다.
+  const fetchDirect = useCallback(async ({ fresh = false } = {}) => {
+    const seq = ++directSeq.current
+    setDirectLoading(true)
+    try {
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate })
+      if (fresh) params.set('fresh', '1')
+      const res = await fetch(`/api/direct/stats?${params}`)
+      const json = await res.json()
+      if (seq === directSeq.current) setDirectData(json)
+    } catch (e) {
+      console.error(e)
+      if (seq === directSeq.current) setDirectData({ success: false, error: String(e) })
+    } finally {
+      if (seq === directSeq.current) setDirectLoading(false)
+    }
+  }, [dates])
+
+  useEffect(() => { fetchDirect() }, [fetchDirect])
+
+  // 비교 기간의 다이렉트 건수
+  useEffect(() => {
+    if (!compareDates) { setDirectCompare(null); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const params = new URLSearchParams({ startDate: compareDates.startDate, endDate: compareDates.endDate })
+        const res = await fetch(`/api/direct/stats?${params}`)
+        const json = await res.json()
+        if (!cancelled && json.success) setDirectCompare(json)
+      } catch (e) { console.error(e) }
+    })()
+    return () => { cancelled = true }
+  }, [compareDates])
+
+  // '지금 갱신' — GitHub Action 을 띄우고 끝날 때까지 폴링한 뒤 다시 읽는다.
+  // 액션은 보통 2분 내외. 4분(=48회 x 5초)이 지나면 폴링을 접고 안내만 남긴다.
+  const refreshDirect = useCallback(async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    setRefreshMsg('실행 요청 중…')
+    try {
+      const res = await fetch('/api/direct/refresh', { method: 'POST' })
+      const json = await res.json()
+
+      if (!json.success) {
+        setRefreshMsg(json.error || '갱신에 실패했습니다')
+        setRefreshing(false)
+        setTimeout(() => setRefreshMsg(''), 8000)
+        return
+      }
+
+      const since = json.dispatchedAt || json.run?.createdAt || new Date().toISOString()
+      setRefreshMsg(json.reused ? '이미 실행 중… 기다리는 중' : '스크래핑 중… (약 2분)')
+
+      for (let i = 0; i < 48; i++) {
+        await new Promise(r => setTimeout(r, 5000))
+        const st = await fetch(`/api/direct/refresh?since=${encodeURIComponent(since)}`).then(r => r.json()).catch(() => null)
+        const run = st?.run
+        if (run && run.status === 'completed') {
+          if (run.conclusion === 'success') {
+            setRefreshMsg('갱신 완료 — 다시 읽는 중')
+            await fetchDirect({ fresh: true })   // 캐시 우회
+            setRefreshMsg('')
+          } else {
+            setRefreshMsg(`실행 실패 (${run.conclusion})`)
+            setTimeout(() => setRefreshMsg(''), 8000)
+          }
+          setRefreshing(false)
+          return
+        }
+        setRefreshMsg(`스크래핑 중… ${(i + 1) * 5}초`)
+      }
+
+      setRefreshMsg('아직 진행 중 — 잠시 후 새로고침')
+      setRefreshing(false)
+      setTimeout(() => setRefreshMsg(''), 10000)
+    } catch (e) {
+      console.error(e)
+      setRefreshMsg('갱신 중 오류')
+      setRefreshing(false)
+      setTimeout(() => setRefreshMsg(''), 8000)
+    }
+  }, [refreshing, fetchDirect])
 
   const exportCSV = useCallback(async () => {
     setExporting(true)
@@ -419,6 +586,9 @@ export default function Dashboard() {
   return (
     <>
     <style suppressHydrationWarning>{`
+      @media (max-width: 1500px) {
+        .gp-stat-grid { grid-template-columns: repeat(4, 1fr) !important; }
+      }
       @media (max-width: 768px) {
         .gp-sidebar { display: none !important; }
         .gp-mobile-nav { display: flex !important; }
@@ -811,6 +981,14 @@ export default function Dashboard() {
                 style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#c55a11', color: 'white', fontSize: 13, cursor: 'pointer' }}>
                 📋 CPA 추적
               </button>
+              {/* 간품 vs 다이렉트 통합 비교 (2026-08-27)
+                  모바일에서는 사이드바가 숨겨져 이 버튼이 유일한 진입점이다 */}
+              <Link href="/vs-direct" style={{ textDecoration: 'none' }}>
+                <div style={{
+                  padding: '8px 12px', borderRadius: 8, background: '#1a1d2e',
+                  color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'
+                }}>⚔️ VS 간판다이렉트</div>
+              </Link>
             </div>
           </div>
 
@@ -825,7 +1003,7 @@ export default function Dashboard() {
                 const cmp = compareData ? compareData.summary : null
                 const d = (cur, key) => (cmp ? <DeltaBadge cur={cur} prev={cmp[key] ?? 0} /> : null)
                 return (
-              <div className="gp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 16, marginBottom: 28 }}>
+              <div className="gp-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 16, marginBottom: 28 }}>
                 <StatCard label="전체 견적요청" value={data.summary.total} color="#4facfe" delta={d(data.summary.total, 'total')} />
                 <StatCard label="유료 광고" value={data.summary.paid} sub="Paid" color="#f39c12" delta={d(data.summary.paid, 'paid')} />
                 <StatCard label="자연유입" value={data.summary.organic} sub="Organic" color="#27ae60" delta={d(data.summary.organic, 'organic')} />
@@ -833,6 +1011,17 @@ export default function Dashboard() {
                 <StatCard label="CPA 에이전시" value={data.summary.cpa} sub="CPA" color="#9b59b6" delta={d(data.summary.cpa, 'cpa')} />
                 <StatCard label="회원가입" value={data.summary.signup} sub="Signup" color="#e74c3c" onClick={() => openCategoryModal('airbridge.user.signup', '회원가입')} delta={d(data.summary.signup, 'signup')} />
                 <StatCard label="방문자 (사람)" value={data.summary.totalSessions ?? 0} sub={`🤖 봇 ${(data.summary.botSessions ?? 0).toLocaleString()} 제외`} color="#16a085" onClick={() => openCategoryModal('session.start', '방문자 (사람)')} delta={d(data.summary.totalSessions ?? 0, 'totalSessions')} />
+                {/* 경쟁사 간판다이렉트 — 우리 지표가 아니므로 회색 계열로 구분 (2026-08-27) */}
+                <DirectStatCard
+                  data={directData}
+                  loading={directLoading}
+                  refreshing={refreshing}
+                  refreshMsg={refreshMsg}
+                  onRefresh={refreshDirect}
+                  delta={Number.isFinite(directCompare?.total)
+                    ? <DeltaBadge cur={Number.isFinite(directData?.total) ? directData.total : 0} prev={directCompare.total} />
+                    : null}
+                />
               </div>
                 )
               })()}
@@ -883,17 +1072,22 @@ export default function Dashboard() {
                 </div>
 
                 <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 24 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 20 }}>일별 견적요청 추이</div>
-                  {data.dailyStats.length === 0 ? (
+                  <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 20 }}>
+                    일별 견적요청 추이
+                    <span style={{ fontSize: 11, color: '#bbb', fontWeight: 400, marginLeft: 8 }}>· 회색 점선 = 간판다이렉트(게시판 노출 기준)</span>
+                  </div>
+                  {data.dailyStats.length === 0 && !(directData?.daily?.length) ? (
                     <div style={{ textAlign: 'center', padding: 60, color: '#bbb', fontSize: 13 }}>데이터가 없습니다</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={260}>
-                      <LineChart data={data.dailyStats}>
+                      <LineChart data={mergeDaily(data.dailyStats, directData?.daily)}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v.slice(5)} />
                         <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                        <Tooltip formatter={v => [v + '건', '견적요청']} />
+                        <Tooltip formatter={(v, name) => [v + '건', name === 'total' ? '우리 견적요청' : '다이렉트']} />
+                        <Legend formatter={name => name === 'total' ? '우리 견적요청' : '다이렉트'} wrapperStyle={{ fontSize: 12 }} />
                         <Line type="monotone" dataKey="total" stroke="#4facfe" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="direct" stroke="#95a5a6" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 2 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   )}
