@@ -614,6 +614,13 @@ export default function Dashboard() {
         .gp-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
       }
       .gp-mobile-nav { display: none; }
+      /* 제목 줄. PC 에서는 내용만큼만 차지해 기존 레이아웃을 건드리지 않는다 */
+      .gp-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .gp-refresh-btn { display: none; }
+      @media (max-width: 768px) {
+        .gp-title-row { width: 100%; }
+        .gp-refresh-btn { display: inline-flex !important; }
+      }
     `}</style>
     {/* 모바일 상단 네비바 */}
     <div className="gp-mobile-nav" style={{
@@ -907,12 +914,35 @@ export default function Dashboard() {
 
           {/* 헤더 */}
           <div className="gp-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>대시보드</h1>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 견적요청 현황</p>
-              {compareDates && (
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#9b59b6', fontWeight: 600 }}>🔁 {compareDates.startDate} ~ {compareDates.endDate} 대비 증감 표시 중</p>
-              )}
+            <div className="gp-title-row">
+              <div>
+                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1a1a1a' }}>대시보드</h1>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#888' }}>채널별 견적요청 현황</p>
+                {compareDates && (
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: '#9b59b6', fontWeight: 600 }}>🔁 {compareDates.startDate} ~ {compareDates.endDate} 대비 증감 표시 중</p>
+                )}
+              </div>
+
+              {/* 모바일 전용 새로고침 (2026-08-27)
+                  기간 프리셋을 다시 눌러도 재조회는 되지만 그게 '새로고침'이라는 게
+                  드러나지 않는다. 흰 화면 오른쪽 위에 명시적인 버튼을 둔다.
+                  페이지를 통째로 리로드하지 않고 데이터만 다시 받아온다. */}
+              <button
+                className="gp-refresh-btn"
+                onClick={() => { fetchStats(); fetchDirect() }}
+                disabled={loading}
+                aria-label="새로고침"
+                style={{
+                  alignItems: 'center', justifyContent: 'center',
+                  width: 38, height: 38, flexShrink: 0,
+                  borderRadius: 10, border: '1px solid #e1e5e9',
+                  background: loading ? '#f0f2f5' : 'white',
+                  color: loading ? '#bbb' : '#4facfe',
+                  fontSize: 17, lineHeight: 1, padding: 0,
+                  cursor: loading ? 'default' : 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}
+              >{loading ? '⏳' : '↻'}</button>
             </div>
             <div className="gp-controls" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* 스테이징 토글 */}
