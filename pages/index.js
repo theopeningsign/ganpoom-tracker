@@ -359,6 +359,7 @@ export default function Dashboard() {
   const [directCompare, setDirectCompare] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshMsg, setRefreshMsg] = useState('')
+  const [resuming, setResuming] = useState(false)   // 앱 복귀 갱신 중
   const fetchSeq = useRef(0)
   const directSeq = useRef(0)
 
@@ -405,16 +406,18 @@ export default function Dashboard() {
     return () => { cancelled = true }
   }, [compareDates, platform, showStaging])
 
-  const fetchStats = useCallback(async () => {
+  // silent:true — 로딩 화면을 띄우지 않는다. 앱 복귀 갱신에 쓴다.
+  // (보고 있던 표가 '불러오는 중...' 으로 깜빡이면 오히려 거슬린다)
+  const fetchStats = useCallback(async ({ silent = false } = {}) => {
     const seq = ++fetchSeq.current
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform, staging: showStaging ? 'true' : 'false' })
       const res = await fetch(`/api/events/stats?${params}`)
       const json = await res.json()
       if (json.success && seq === fetchSeq.current) setData(json)
     } catch (e) { console.error(e) }
-    finally { if (seq === fetchSeq.current) setLoading(false) }
+    finally { if (seq === fetchSeq.current && !silent) setLoading(false) }
   }, [dates, platform, showStaging])
 
   useEffect(() => { fetchStats() }, [fetchStats])
@@ -422,9 +425,9 @@ export default function Dashboard() {
   // 간판다이렉트 접수 건수 조회 (2026-08-27)
   // 대시보드 기간과 완전히 같은 startDate/endDate 를 쓴다. platform/staging 은
   // 남의 사이트 데이터라 적용 대상이 아니므로 의존성에 넣지 않는다.
-  const fetchDirect = useCallback(async ({ fresh = false } = {}) => {
+  const fetchDirect = useCallback(async ({ fresh = false, silent = false } = {}) => {
     const seq = ++directSeq.current
-    setDirectLoading(true)
+    if (!silent) setDirectLoading(true)
     try {
       const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate })
       if (fresh) params.set('fresh', '1')
@@ -433,9 +436,10 @@ export default function Dashboard() {
       if (seq === directSeq.current) setDirectData(json)
     } catch (e) {
       console.error(e)
-      if (seq === directSeq.current) setDirectData({ success: false, error: String(e) })
+      // 조용한 갱신이 실패했다고 이미 떠 있던 숫자를 지우면 안 된다
+      if (seq === directSeq.current && !silent) setDirectData({ success: false, error: String(e) })
     } finally {
-      if (seq === directSeq.current) setDirectLoading(false)
+      if (seq === directSeq.current && !silent) setDirectLoading(false)
     }
   }, [dates])
 
@@ -505,6 +509,48 @@ export default function Dashboard() {
       setTimeout(() => setRefreshMsg(''), 8000)
     }
   }, [refreshing, fetchDirect])
+
+  // ── 앱(홈 화면 PWA) 복귀 시 1회 갱신 (2026-08-28) ──────────────────
+  //
+  // 홈 화면에 추가해 독립 앱으로 쓰면 브라우저 UI가 없어 '당겨서 새로고침'이 안 된다.
+  // 게다가 iOS 는 앱을 백그라운드에 잠깐 뒀다 돌아오면 **이전 화면을 그대로 복원**한다
+  // (오래 두거나 메모리가 부족하면 통째로 다시 로드 — 어느 쪽일지 예측 불가).
+  // 그래서 몇 시간 전 숫자를 최신인 줄 알고 보게 되는 일이 생긴다.
+  //
+  // 여기서는 **주기적 폴링을 하지 않는다.** 백그라운드에서는 아무것도 하지 않고,
+  // 화면으로 돌아온 그 순간에만 한 번 다시 받아온다.
+  // iOS 는 복귀 시 visibilitychange 와 focus 를 둘 다 쏘기도 해서 최소 간격을 둔다.
+  const RESUME_MIN_GAP_MS = 30 * 1000
+  const lastResumeAt = useRef(Date.now())
+  const busyRef = useRef(false)
+  busyRef.current = loading || refreshing || resuming
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    const onResume = async () => {
+      if (document.visibilityState !== 'visible') return
+      if (busyRef.current) return                       // 이미 뭔가 받아오는 중
+      if (Date.now() - lastResumeAt.current < RESUME_MIN_GAP_MS) return
+      lastResumeAt.current = Date.now()
+
+      setResuming(true)
+      try {
+        await Promise.all([fetchStats({ silent: true }), fetchDirect({ silent: true })])
+      } finally {
+        setResuming(false)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onResume)
+    window.addEventListener('focus', onResume)
+    window.addEventListener('pageshow', onResume)       // iOS 뒤로가기 캐시 복원 대응
+    return () => {
+      document.removeEventListener('visibilitychange', onResume)
+      window.removeEventListener('focus', onResume)
+      window.removeEventListener('pageshow', onResume)
+    }
+  }, [fetchStats, fetchDirect])
 
   const exportCSV = useCallback(async () => {
     setExporting(true)
@@ -930,19 +976,20 @@ export default function Dashboard() {
               <button
                 className="gp-refresh-btn"
                 onClick={() => { fetchStats(); fetchDirect() }}
-                disabled={loading}
+                disabled={loading || resuming}
                 aria-label="새로고침"
+                title={resuming ? '앱으로 돌아와 자동 갱신 중' : '최신 데이터 다시 불러오기'}
                 style={{
                   alignItems: 'center', justifyContent: 'center',
                   width: 38, height: 38, flexShrink: 0,
                   borderRadius: 10, border: '1px solid #e1e5e9',
-                  background: loading ? '#f0f2f5' : 'white',
-                  color: loading ? '#bbb' : '#4facfe',
+                  background: (loading || resuming) ? '#f0f2f5' : 'white',
+                  color: (loading || resuming) ? '#bbb' : '#4facfe',
                   fontSize: 17, lineHeight: 1, padding: 0,
-                  cursor: loading ? 'default' : 'pointer',
+                  cursor: (loading || resuming) ? 'default' : 'pointer',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                 }}
-              >{loading ? '⏳' : '↻'}</button>
+              >{(loading || resuming) ? '⏳' : '↻'}</button>
             </div>
             <div className="gp-controls" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {/* 스테이징 토글 */}
