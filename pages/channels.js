@@ -1062,14 +1062,21 @@ export default function ChannelsPage() {
                     <>
                       <div className="ch-banner-div" style={{ width: 1, height: 40, background: 'rgba(255,255,255,0.2)', marginRight: 32 }} />
                       <div className="ch-banner-channels" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                        {channelQuotes.map(ch => (
-                          <div key={ch.channel}>
-                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
-                              {CHANNEL_LABELS[ch.channel] || ch.channel}
+                        {channelQuotes.map(ch => {
+                          // 비교기간의 채널별 견적수 — 아래 채널 카드의 cmpCh 와 동일한 조회
+                          const cmpCh = compareData
+                            ? ((compareData.channelStats || []).find(c => c.channel === ch.channel) || { count: 0 })
+                            : null
+                          return (
+                            <div key={ch.channel}>
+                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
+                                {CHANNEL_LABELS[ch.channel] || ch.channel}
+                              </div>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{ch.count.toLocaleString()}건</div>
+                              {cmpCh && <DeltaBadge cur={ch.count} prev={cmpCh.count} suffix="건" light />}
                             </div>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{ch.count.toLocaleString()}건</div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </>
                   )}
