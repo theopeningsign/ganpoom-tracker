@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/adcosts/sync-naver",
+      "schedule": "0 21 * * *"
+    }
+  ]
+}
