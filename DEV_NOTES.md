@@ -434,6 +434,14 @@ CREATE TABLE unconfirmed_status (
 ## 🚧 미완료 / 향후 과제
 
 ### 단기
+- [ ] **구글 광고비 자동 입력 — 1단계(읽기 검증)에서 대기 중** (2026-09-11)
+  - 방식 확정: 공식 API(관리자계정·브랜드인증·등급승인·OAuth) 대신 **구글 광고 내장 스크립트**가 매일 06시 비용을 트래커로 **밀어넣는** 구조 (네이버는 트래커가 가져오는 구조 — 반대). 계정만 있으면 됨, 일별 예약 가능, 외부 전송 가능 — 공식 문서 확인.
+  - 막힌 이유: 인증 단계에서 운영자 계정(hyukjune.gp)이 **새 패스키 보안 지연 6일** → **2026-09-17 이후** 재시도. itransme@ 계정(근표)으로 대신 인증도 가능하나 장기적으론 운영자 계정 권장(인증한 사람 권한으로 계속 돔).
+  - 재개 절차: `docs/google-ads/1단계_읽기전용.js` 를 스크립트에 붙여넣기 → 저장 → 인증 → 미리보기 → **로그 탭** 복사 → 9/1~9/10 수기값(9/1 구글광고 46,743 / 앱 285 …)과 대조 → 부가세 기준·유형 매핑(예상 SEARCH→`google`, MULTI_CHANNEL→`google_app`) 확정.
+  - 2단계(미구현): 트래커에 받는 문 `/api/adcosts/sync-google` (POST, CRON_SECRET 잠금, `lib/adcostSync.js` 와 같은 빈칸만 채움 규칙) + 스크립트에 `UrlFetchApp.fetch(url, {method:'post', contentType:'application/json', payload, headers})` 전송 추가 + 구글 화면에서 매일 06:00 예약.
+  - 텐핑: API 유무 미확인 → 수기 유지.
+- [ ] `/api/adcosts` POST(수기 저장) 무인증·CORS `*` → CRON_SECRET 또는 세션 기반으로 잠금 (자동입력과 별개 보안 건)
+- [ ] Vercel `SUPABASE_SERVICE_ROLE_KEY` 가 Config(값 보임)로 저장돼 "Needs Attention" 표시 → Secret 으로 전환
 - [ ] 회원가입 트래커 누락 수정
   - `ganpoomreact/SignUp.js`, `common.js`에 `GanpoomTracker.track('airbridge.user.signup')` 직접 호출 추가 필요
   - 가이드: `회원가입-트래커-누락-수정-가이드.md`
