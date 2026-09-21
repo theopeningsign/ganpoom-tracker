@@ -124,6 +124,12 @@ ganpoom-tracker-main/
 `prevent_duplicate_events` — BEFORE INSERT, 2초 이내 동일 session+event 차단.
 트리거가 INSERT를 막으면 `.select('id').maybeSingle()` 로 감지 후 fallback UPDATE 수행.
 
+### ⚠️ 스테이징 테스트는 시크릿 창에서 (2026-09-17 확인, 코드 수정 안 함)
+- `gp_attr`(30일)·`gp_session` 쿠키가 `domain=.ganpoom.com` 이라 **www 와 staging2 가 같은 쿠키를 공유**한다.
+- 이벤트의 `landing_page` 는 쿠키 값을 우선 쓰고(gp.js), `is_staging` 은 landing_page/referrer 에 "staging" 이 있는지로만 판정(log.js) → 본서버를 광고 파라미터로 들어온 적 있는 브라우저로 스테이징 견적을 넣으면 **본서버·해당 광고채널 전환으로 기록**된다. (브라우저 재현으로 확인)
+- 실제 고객은 스테이징에 오지 않으므로 고객 기록엔 영향 없음. 운영자 테스트에만 해당 → **시크릿 창으로 스테이징 접속**하면 쿠키가 비어 landing_page=staging2, is_staging=true 로 정상 기록.
+- 코드 수정안(gp.js 가 `page_url` 을 보내고 log.js 가 호스트 기준 판정)은 검토했으나, gp.js 는 본서버 전 페이지에 실리는 스크립트라 잘 되는 기록을 건드릴 위험 대비 실익이 작아 **보류**(2026-09-17 운영자 결정).
+
 ---
 
 ## 📊 주요 이벤트 목록
@@ -171,6 +177,13 @@ ganpoom-tracker-main/
 ---
 
 ## 📝 개발 이력
+
+### 2026-09-21 — 구글 광고비 자동 입력 (구글 광고 스크립트 → 트래커 push) ⭐
+- **구조:** 네이버와 반대 방향. 구글 광고 안의 스크립트(`docs/google-ads/2단계_자동전송.js`)가 매일 06시 최근 7일(어제까지) 캠페인 유형별 비용을 `POST /api/adcosts/sync-google` 로 보냄. 트래커는 받기만 함(Vercel cron 없음, 환경변수 추가 없음 — CRON_SECRET 재사용).
+- **1단계 검증(2026-09-21):** 읽기 전용 스크립트 로그 9/1~9/10 ↔ 수기 ad_costs **20칸 전부 일치** → 매핑 `SEARCH→google`, `MULTI_CHANNEL→google_app` 확정, 금액은 구글 화면값 그대로(부가세 환산 없음). 인증 우여곡절: 패스키 6일 지연 → "1일 후" → "패스키 호환 안 됨" → 비밀번호 등 다른 방법으로 통과.
+- **코드:** `lib/adcostSync.js` 를 공통 `planFill()` 로 정리(네이버 `planNaverSync` 동작 불변, 회귀 확인) + `planGoogleSync(rows)` 추가(미매핑 유형은 무시하고 `ignoredTypes` 로 응답, 오늘 날짜는 범위 밖 처리). `pages/api/adcosts/sync-google.js` — POST 전용, Bearer CRON_SECRET, rows 형식 검증(최대 500행).
+- **로컬 검증(next dev):** 키 없음 401 / GET 405 / 날짜 형식 오류 400 / 정상 200 `written=0 skipped=2 ignoredTypes=[VIDEO]`(기존 값 있는 날짜만 보내 DB 무변경). 첫 실행 시 채워질 칸 = 9/14 구글 두 칸(0원)부터 9/20 까지.
+- **운영 절차(사용자):** 구글 광고 → 스크립트 → 새 스크립트에 2단계 코드 붙여넣기(SECRET 채운 버전) → 저장 → 인증 → 미리보기(로그 "응답 200") → 실행 → 빈도 매일 06:00. 실패 시 스크립트가 예외를 던져 구글 화면 이력에 오류로 표시됨.
 
 ### 2026-09-11 — 네이버 광고비 자동 입력 (검색광고 API → ad_costs) ⭐
 - **목적:** 매일 광고주센터 보고 손으로 넣던 네이버 검색광고·파워컨텐츠 광고비를 자동 기입.
@@ -434,12 +447,9 @@ CREATE TABLE unconfirmed_status (
 ## 🚧 미완료 / 향후 과제
 
 ### 단기
-- [ ] **구글 광고비 자동 입력 — 1단계(읽기 검증)에서 대기 중** (2026-09-11)
-  - 방식 확정: 공식 API(관리자계정·브랜드인증·등급승인·OAuth) 대신 **구글 광고 내장 스크립트**가 매일 06시 비용을 트래커로 **밀어넣는** 구조 (네이버는 트래커가 가져오는 구조 — 반대). 계정만 있으면 됨, 일별 예약 가능, 외부 전송 가능 — 공식 문서 확인.
-  - 막힌 이유: 인증 단계에서 운영자 계정(hyukjune.gp)과 itransme@(근표) 계정 **둘 다 새 패스키 보안 지연 6일**에 걸림(2026-09-11 확인) → **2026-09-17 이후** 재시도. 공식 API로 바꿔도 같은 구글 계정 허락이 필요해 대기를 못 피함. 인증은 운영자 본인 계정으로(인증한 사람 권한으로 계속 돔).
-  - 재개 절차: `docs/google-ads/1단계_읽기전용.js` 를 스크립트에 붙여넣기 → 저장 → 인증 → 미리보기 → **로그 탭** 복사 → 9/1~9/10 수기값(9/1 구글광고 46,743 / 앱 285 …)과 대조 → 부가세 기준·유형 매핑(예상 SEARCH→`google`, MULTI_CHANNEL→`google_app`) 확정.
-  - 2단계(미구현): 트래커에 받는 문 `/api/adcosts/sync-google` (POST, CRON_SECRET 잠금, `lib/adcostSync.js` 와 같은 빈칸만 채움 규칙) + 스크립트에 `UrlFetchApp.fetch(url, {method:'post', contentType:'application/json', payload, headers})` 전송 추가 + 구글 화면에서 매일 06:00 예약.
-  - 텐핑: API 유무 미확인 → 수기 유지.
+- [ ] **구글 광고비 자동 입력 — 트래커 쪽 완료(2026-09-21), 구글 화면 등록만 남음**
+  - 남은 것(사용자): 2단계 스크립트 등록 → 미리보기 "응답 200" → 실행 → 매일 06:00 예약. 그 다음 날 광고비 페이지에서 9/14~ 구글 두 칸 채워졌는지 확인.
+  - 상세는 개발 이력 2026-09-21 항목. 텐핑: API 없음 → 수기 유지.
 - [ ] `/api/adcosts` POST(수기 저장) 무인증·CORS `*` → CRON_SECRET 또는 세션 기반으로 잠금 (자동입력과 별개 보안 건)
 - [ ] Vercel `SUPABASE_SERVICE_ROLE_KEY` 가 Config(값 보임)로 저장돼 "Needs Attention" 표시 → Secret 으로 전환
 - [ ] 회원가입 트래커 누락 수정
