@@ -586,7 +586,7 @@ export default function Dashboard() {
       const res = await fetch(`/api/events/export?${params}`)
       const json = await res.json()
       if (!json.success) return
-      const CPA_HEADERS = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Ad Group', 'Ad Creative', 'Browser Referrer', 'Device Type', 'OS Name', 'Client IP', 'Client IP City', 'Client IP Subdivision']
+      const CPA_HEADERS = ['Event Category', 'Event Datetime', 'Channel', 'Campaign', 'Ad Group', 'Ad Creative', 'Browser Referrer', 'Device Type', 'OS Name', 'Client IP', 'Client IP City', 'Client IP Subdivision', '봇 여부']
       const cpaRows = json.events.map(e => {
         return [
           formatEventCategory(e.event_category, e.platform),
@@ -601,10 +601,11 @@ export default function Dashboard() {
           e.client_ip || '',
           e.client_ip_city || '',
           e.client_ip_subdivision || '',
+          e.is_bot ? '봇' : '',
         ]
       })
       const ws = XLSX.utils.aoa_to_sheet([CPA_HEADERS, ...cpaRows])
-      ws['!cols'] = [42, 28, 20, 20, 12, 12, 60, 12, 14, 18, 20, 22].map(w => ({ wch: w }))
+      ws['!cols'] = [42, 28, 20, 20, 12, 12, 60, 12, 14, 18, 20, 22, 8].map(w => ({ wch: w }))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'CPA 추적')
       XLSX.writeFile(wb, `간품_CPA추적_${dates.startDate}_${dates.endDate}.xlsx`)
