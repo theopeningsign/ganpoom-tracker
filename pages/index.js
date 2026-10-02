@@ -581,7 +581,8 @@ export default function Dashboard() {
   const exportCPAExcel = useCallback(async () => {
     setExporting(true)
     try {
-      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform })
+      // bots=agents: 에이전트 링크로 들어온 접속은 봇도 포함 (실적 리포트와 같은 기준 — 2026-10-02)
+      const params = new URLSearchParams({ startDate: dates.startDate, endDate: dates.endDate, platform, bots: 'agents' })
       const res = await fetch(`/api/events/export?${params}`)
       const json = await res.json()
       if (!json.success) return
