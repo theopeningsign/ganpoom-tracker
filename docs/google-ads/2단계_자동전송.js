@@ -27,7 +27,16 @@ function main() {
     "WHERE segments.date BETWEEN '" + SINCE + "' AND '" + UNTIL + "' " +
     "AND metrics.cost_micros > 0";
 
-  var report = AdsApp.report(query).rows();
+  // 구글 쪽 일시 오류("Could not read from Google Ads" — 2026-10-02 05:49 실제 발생) 대비: 30초 간격 최대 3회 재시도
+  var report = null;
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    try { report = AdsApp.report(query).rows(); break; }
+    catch (e) {
+      Logger.log('구글 광고 읽기 실패 ' + attempt + '/3 : ' + e);
+      if (attempt === 3) throw e;
+      Utilities.sleep(30000);
+    }
+  }
   var byKey = {};   // "날짜|유형" → 비용(원)
   while (report.hasNext()) {
     var row = report.next();
